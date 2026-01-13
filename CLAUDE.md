@@ -19,8 +19,8 @@ TrendPulse 舆情脉冲 is a full-stack social media sentiment analysis applicat
   - `praw` for Reddit API
   - `youtube-transcript-api` for YouTube captions
   - `Playwright`/`Selenium` for X/Twitter scraping
-- **Database**: SQLite or PostgreSQL
-- **AI**: Large Language Model API (provided separately)
+- **Database**: SQLite
+- **AI**: Large Language Model API (使用通义千问)
 - **Optional**: LangChain for AI operation chaining
 
 ### Frontend (Flutter)
