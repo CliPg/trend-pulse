@@ -119,7 +119,7 @@ Backend will run on http://localhost:8000
 **Terminal 2 - Frontend**:
 ```bash
 cd frontend
-flutter run
+flutter run -d chrome
 ```
 
 Flutter app will launch and connect to the backend.
