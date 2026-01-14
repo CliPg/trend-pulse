@@ -86,10 +86,20 @@ class YouTubeCollector(BaseCollector):
 
         print(f"📺 Found {len(videos)} videos, fetching transcripts...")
 
+        # Print video URLs for reference
+        print("📋 Video URLs:")
+        for i, video in enumerate(videos, 1):
+            url = f"https://youtube.com/watch?v={video['id']}"
+            title = video.get('title', 'Unknown')[:50]  # Truncate long titles
+            print(f"  {i}. {title}...")
+            print(f"     {url}")
+
         # Step 2: Fetch transcripts sequentially (to avoid IP blocking)
         posts = []
         for i, video in enumerate(videos, 1):
+            url = f"https://youtube.com/watch?v={video['id']}"
             print(f"  [{i}/{len(videos)}] Fetching transcript for {video['id']}...")
+            print(f"     URL: {url}")
             try:
                 result = await self._fetch_transcript(video, language)
 
@@ -99,13 +109,13 @@ class YouTubeCollector(BaseCollector):
                         post_id=video["id"],
                         author=video["channel_title"],
                         content=result,
-                        url=f"https://youtube.com/watch?v={video['id']}",
+                        url=url,
                         likes=video.get("like_count", 0),
                         comments_count=video.get("comment_count", 0),
                         created_at=video.get("published_at"),
                     )
                     posts.append(post)
-                    print(f"    ✓ Success")
+                    print(f"    ✓ Success (transcript length: {len(result)} chars)")
                 else:
                     print(f"    ⚠️  No transcript available")
 
