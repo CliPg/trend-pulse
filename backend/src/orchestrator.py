@@ -59,7 +59,7 @@ class TrendPulseOrchestrator:
         keyword: str,
         language: str = "en",
         platforms: Optional[List[str]] = None,
-        limit_per_platform: int = 50,
+        limit_per_platform: int = 20,  # Reduced from 50 to 20 for testing
     ) -> Dict:
         """
         Complete analysis pipeline for a keyword.
