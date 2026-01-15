@@ -63,11 +63,12 @@ class BaseCollector(ABC):
         Returns:
             Cleaned content string
         """
+        # Remove markdown links FIRST (before removing URLs)
+        # This prevents breaking the link structure
+        content = re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", content)
+
         # Remove URLs
         content = re.sub(r"http\S+", "", content)
-
-        # Remove markdown links
-        content = re.sub(r"\[([^\]]+)\]\([^\)]+\)", r"\1", content)
 
         # Remove extra whitespace and newlines
         content = " ".join(content.split())
