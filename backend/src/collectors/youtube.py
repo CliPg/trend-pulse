@@ -5,30 +5,17 @@ Collects video metadata and transcripts based on keyword search.
 import asyncio
 import os
 import functools
-from typing import List
+import random
+from typing import List, Optional
 import aiohttp
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.proxies import GenericProxyConfig, WebshareProxyConfig
 from youtube_transcript_api._errors import (
     TranscriptsDisabled,
     NoTranscriptFound,
     VideoUnavailable,
 )
 from src.collectors.base import BaseCollector, PostData
-
-
-class TranscriptProxy:
-    """Proxy handler for YouTube transcript API."""
-
-    @staticmethod
-    def get_proxy_dict():
-        """Get proxy configuration from environment."""
-        http_proxy = os.getenv("HTTP_PROXY") or os.getenv("HTTPS_PROXY")
-        if http_proxy:
-            return {
-                "http": http_proxy,
-                "https": http_proxy,
-            }
-        return None
 
 
 class YouTubeCollector(BaseCollector):
@@ -58,7 +45,44 @@ class YouTubeCollector(BaseCollector):
 
         # Get proxy from environment variable
         self.proxy = os.getenv("HTTP_PROXY") or os.getenv("HTTPS_PROXY")
-        self.proxy_dict = TranscriptProxy.get_proxy_dict()
+        self.proxy_config = self._create_proxy_config()
+
+    def _create_proxy_config(self) -> Optional[GenericProxyConfig | WebshareProxyConfig]:
+        """
+        Create proxy configuration for YouTubeTranscriptApi.
+
+        Supports multiple proxy types:
+        1. Webshare residential proxies (recommended for production)
+        2. Generic HTTP/HTTPS proxies (for local development)
+
+        Priority: Webshare > Generic HTTP_PROXY
+
+        Returns:
+            GenericProxyConfig or WebshareProxyConfig if proxy is set, None otherwise
+        """
+        # Priority 1: Check for Webshare proxy configuration
+        webshare_username = os.getenv("WEBSHARE_PROXY_USERNAME")
+        webshare_password = os.getenv("WEBSHARE_PROXY_PASSWORD")
+
+        if webshare_username and webshare_password:
+            print("✓ Using Webshare residential proxy")
+            return WebshareProxyConfig(
+                proxy_username=webshare_username,
+                proxy_password=webshare_password,
+            )
+
+        # Priority 2: Check for generic HTTP/HTTPS proxy
+        http_proxy = os.getenv("HTTP_PROXY") or os.getenv("HTTPS_PROXY")
+        if http_proxy:
+            print(f"✓ Using generic proxy: {http_proxy}")
+            # Use the same proxy for both HTTP and HTTPS
+            return GenericProxyConfig(
+                http_url=http_proxy,
+                https_url=http_proxy,
+            )
+
+        # No proxy configured
+        return None
 
     async def search(
         self, keyword: str, language: str = "en", limit: int = 50
@@ -74,8 +98,12 @@ class YouTubeCollector(BaseCollector):
         Returns:
             List of PostData objects with transcripts as content
         """
-        # Limit concurrent requests to avoid IP blocking
-        actual_limit = min(limit, 10)  # Max 10 videos at a time
+        # Conservative limits to avoid IP blocking
+        actual_limit = min(limit, 5)  # Reduced from 10 to 5
+
+        print(f"🔍 Searching for videos with keyword: '{keyword}'")
+        print(f"📊 Limit: {actual_limit} videos (conservative mode to avoid IP blocking)")
+        print()
 
         # Step 1: Search for videos
         videos = await self._search_videos(keyword, actual_limit)
@@ -85,21 +113,29 @@ class YouTubeCollector(BaseCollector):
             return []
 
         print(f"📺 Found {len(videos)} videos, fetching transcripts...")
+        print(f"⏱️  Using conservative delays (3-6 seconds between requests) to avoid IP blocking")
+        print()
 
         # Print video URLs for reference
         print("📋 Video URLs:")
         for i, video in enumerate(videos, 1):
             url = f"https://youtube.com/watch?v={video['id']}"
-            title = video.get('title', 'Unknown')[:50]  # Truncate long titles
+            title = video.get('title', 'Unknown')[:50]
             print(f"  {i}. {title}...")
             print(f"     {url}")
+        print()
+
+        # Add initial random delay before starting
+        initial_delay = random.uniform(2, 4)
+        print(f"⏳ Waiting {initial_delay:.1f} seconds before starting...")
+        await asyncio.sleep(initial_delay)
 
         # Step 2: Fetch transcripts sequentially (to avoid IP blocking)
         posts = []
         for i, video in enumerate(videos, 1):
             url = f"https://youtube.com/watch?v={video['id']}"
             print(f"  [{i}/{len(videos)}] Fetching transcript for {video['id']}...")
-            print(f"     URL: {url}")
+
             try:
                 result = await self._fetch_transcript(video, language)
 
@@ -119,14 +155,22 @@ class YouTubeCollector(BaseCollector):
                 else:
                     print(f"    ⚠️  No transcript available")
 
-                # Add delay between requests to avoid IP blocking
+                # Add random delay between requests (3-6 seconds) to avoid IP blocking
                 if i < len(videos):
-                    await asyncio.sleep(2)
+                    delay = random.uniform(3, 6)
+                    print(f"    ⏳ Waiting {delay:.1f} seconds before next request...")
+                    await asyncio.sleep(delay)
 
             except Exception as e:
                 print(f"    ✗ Failed: {str(e)[:100]}")
+                # Add extra delay on error
+                error_delay = random.uniform(5, 8)
+                print(f"    ⏳ Waiting {error_delay:.1f} seconds due to error...")
+                await asyncio.sleep(error_delay)
                 continue
 
+        print()
+        print(f"✅ Completed! Successfully fetched {len(posts)}/{len(videos)} transcripts")
         return posts
 
     async def _search_videos(self, keyword: str, limit: int) -> List[dict]:
@@ -243,16 +287,18 @@ class YouTubeCollector(BaseCollector):
         loop = asyncio.get_event_loop()
 
         try:
-            # Create API instance with proxy if configured
-            if self.proxy_dict:
-                print(f"    Using proxy: {self.proxy_dict['https']}")
-                api = YouTubeTranscriptApi(proxies=self.proxy_dict)
+            # Create API instance with proxy config if available
+            if self.proxy_config:
+                # Print proxy info (already printed in __init__, so this is just for debug)
+                api = YouTubeTranscriptApi(proxy_config=self.proxy_config)
             else:
+                print("    ⚠️  No proxy configured - may encounter IP blocking")
                 api = YouTubeTranscriptApi()
 
             # Use functools.partial to bind the video_id parameter
+            # Pass languages parameter for better compatibility
             fetch_transcript_func = functools.partial(
-                api.fetch, video_id
+                api.fetch, video_id, languages=[language]
             )
 
             # Run in thread pool to avoid blocking
@@ -260,7 +306,8 @@ class YouTubeCollector(BaseCollector):
                 None, fetch_transcript_func
             )
 
-            # Combine transcript segments (new API returns FetchedTranscript with snippets)
+            # Extract text from transcript snippets
+            # FetchedTranscript object contains snippets list with text, start, duration
             text = " ".join([snippet.text for snippet in transcript.snippets])
             text = self.clean_content(text)
 
@@ -274,7 +321,14 @@ class YouTubeCollector(BaseCollector):
             return None
         except Exception as e:
             # Check for IP blocking errors
+            print(f"    ✗ Error fetching transcript: {str(e)}")
             error_str = str(e).lower()
             if "ip blocked" in error_str or "requestblocked" in error_str or "ipblocked" in error_str:
-                print(f"    ⚠️  YouTube IP blocking detected - use proxy or try again later")
+                print(f"    ⚠️  YouTube IP blocking detected!")
+                print(f"    💡 Solution: Configure proxy in .env file:")
+                print(f"       # Option 1: Webshare residential proxy (recommended)")
+                print(f"       WEBSHARE_PROXY_USERNAME=your_username")
+                print(f"       WEBSHARE_PROXY_PASSWORD=your_password")
+                print(f"       # Option 2: Generic HTTP proxy")
+                print(f"       HTTP_PROXY=http://127.0.0.1:7890")
             return None
