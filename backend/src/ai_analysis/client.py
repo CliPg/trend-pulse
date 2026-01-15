@@ -1,8 +1,8 @@
 """
 LLM API client for AI analysis.
-Supports Tongyi Qianwen (Alibaba's Qwen model) via OpenAI-compatible API.
+Supports multiple LLM providers: OpenAI, Tongyi Qianwen (Alibaba's Qwen model).
 """
-from typing import List, Dict
+from typing import List, Dict, Optional
 import aiohttp
 import asyncio
 import json
@@ -10,17 +10,35 @@ from src.config import Config
 
 
 class LLMClient:
-    """Client for interacting with LLM API (Tongyi Qianwen)."""
+    """Client for interacting with various LLM APIs."""
 
-    def __init__(self):
-        """Initialize LLM client with configuration from environment."""
-        self.api_key = Config.LLM_API_KEY
-        self.base_url = Config.LLM_API_BASE_URL
-        self.model = Config.LLM_MODEL
+    def __init__(self, provider: Optional[str] = None):
+        """
+        Initialize LLM client with configuration from environment.
+
+        Args:
+            provider: LLM provider ('openai', 'tongyi'). If None, uses LLM_PROVIDER from env.
+        """
+        self.provider = provider or Config.LLM_PROVIDER
+
+        # Configure based on provider
+        if self.provider == "openai":
+            print("🔧 Using OpenAI LLM provider")
+            self.api_key = Config.OPENAI_API_KEY or Config.LLM_API_KEY
+            self.base_url = Config.OPENAI_BASE_URL
+            self.model = Config.OPENAI_MODEL
+        else:  # tongyi (default)
+            print("🔧 Using Tongyi LLM provider")
+            self.api_key = Config.TONGYI_API_KEY or Config.LLM_API_KEY
+            self.base_url = Config.TONGYI_BASE_URL
+            self.model = Config.TONGYI_MODEL
 
         if not self.api_key:
-            print("⚠️  Warning: LLM API key not configured in environment")
-            print("   Please set LLM_API_KEY in your .env file")
+            print(f"⚠️  Warning: LLM API key not configured for provider '{self.provider}'")
+            if self.provider == "openai":
+                print("   Please set OPENAI_API_KEY in your .env file")
+            else:
+                print("   Please set TONGYI_API_KEY in your .env file")
 
     async def chat_completion(
         self,

@@ -24,8 +24,23 @@ class Config:
     # X/Twitter (Optional)
     TWITTER_BEARER_TOKEN: Optional[str] = os.getenv("TWITTER_BEARER_TOKEN")
 
-    # LLM API (Tongyi Qianwen)
+    # LLM API Configuration
+    LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "openai")  # Options: openai, tongyi
     LLM_API_KEY: str = os.getenv("LLM_API_KEY", "")
+
+    # OpenAI Configuration
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+
+    # Tongyi Qianwen Configuration
+    TONGYI_API_KEY: str = os.getenv("TONGYI_API_KEY", "")
+    TONGYI_MODEL: str = os.getenv("TONGYI_MODEL", "qwen-plus")
+    TONGYI_BASE_URL: str = os.getenv(
+        "TONGYI_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    )
+
+    # Legacy support (for backward compatibility)
     LLM_API_BASE_URL: str = os.getenv(
         "LLM_API_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"
     )
