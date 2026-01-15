@@ -31,7 +31,7 @@ class HalfGauge extends StatelessWidget {
     final primaryColor = gradientColors.first;
 
     return Container(
-      height: 240,
+      height: 280,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -65,7 +65,7 @@ class HalfGauge extends StatelessWidget {
             Text(
               title,
               style: TextStyle(
-                fontSize: 15,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Colors.grey[800],
               ),
@@ -89,14 +89,14 @@ class HalfGauge extends StatelessWidget {
                 if (emoji != null) ...[
                   Text(
                     emoji!,
-                    style: const TextStyle(fontSize: 32),
+                    style: const TextStyle(fontSize: 36),
                   ),
                   const SizedBox(height: 2),
                 ],
                 Text(
                   value.toStringAsFixed(0),
                   style: TextStyle(
-                    fontSize: 32,
+                    fontSize: 42,
                     fontWeight: FontWeight.bold,
                     foreground: Paint()
                       ..shader = LinearGradient(
@@ -110,7 +110,7 @@ class HalfGauge extends StatelessWidget {
                 Text(
                   subtitle.toUpperCase(),
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: primaryColor,
                     letterSpacing: 1.0,
@@ -118,10 +118,10 @@ class HalfGauge extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             // Progress bar with gradient
             Container(
-              height: 6,
+              height: 8,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(4),
               ),
@@ -148,12 +148,12 @@ class HalfGauge extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             // Percentage text
             Text(
               "${(percentage * 100).toStringAsFixed(0)}%",
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: Colors.grey[700],
               ),
