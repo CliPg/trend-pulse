@@ -4,6 +4,8 @@ Supports Tongyi Qianwen (Alibaba's Qwen model) via OpenAI-compatible API.
 """
 from typing import List, Dict
 import aiohttp
+import asyncio
+import json
 from src.config import Config
 
 
@@ -17,25 +19,31 @@ class LLMClient:
         self.model = Config.LLM_MODEL
 
         if not self.api_key:
-            raise ValueError("LLM API key not configured")
+            print("⚠️  Warning: LLM API key not configured in environment")
+            print("   Please set LLM_API_KEY in your .env file")
 
     async def chat_completion(
         self,
         messages: List[Dict[str, str]],
         temperature: float = 0.7,
         max_tokens: int = 1000,
+        retry_count: int = 3,
     ) -> str:
         """
-        Send chat completion request to LLM.
+        Send chat completion request to LLM with retry mechanism.
 
         Args:
             messages: List of message dicts with 'role' and 'content'
             temperature: Sampling temperature (0-1)
             max_tokens: Maximum tokens in response
+            retry_count: Number of retries on failure
 
         Returns:
             Response text
         """
+        if not self.api_key:
+            raise ValueError("LLM API key not configured. Please set LLM_API_KEY in .env file")
+
         url = f"{self.base_url}/chat/completions"
 
         headers = {
@@ -50,15 +58,55 @@ class LLMClient:
             "max_tokens": max_tokens,
         }
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, headers=headers, json=payload) as response:
-                if response.status != 200:
-                    error_text = await response.text()
-                    raise Exception(f"LLM API error: {error_text}")
+        for attempt in range(retry_count):
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(url, headers=headers, json=payload) as response:
+                        if response.status != 200:
+                            error_text = await response.text()
+                            print(f"❌ LLM API error (status {response.status}): {error_text[:200]}")
+                            if attempt < retry_count - 1:
+                                print(f"   Retrying... ({attempt + 1}/{retry_count})")
+                                await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                                continue
+                            raise Exception(f"LLM API error after {retry_count} attempts: {error_text}")
 
-                data = await response.json()
+                        data = await response.json()
 
-        return data["choices"][0]["message"]["content"]
+                        # Extract response content
+                        if "choices" not in data or not data["choices"]:
+                            print(f"❌ Invalid API response format: {json.dumps(data, indent=2)[:500]}")
+                            if attempt < retry_count - 1:
+                                print(f"   Retrying... ({attempt + 1}/{retry_count})")
+                                await asyncio.sleep(2 ** attempt)
+                                continue
+                            raise Exception("Invalid API response: missing 'choices' field")
+
+                        content = data["choices"][0]["message"]["content"]
+
+                        # Debug: Log response length
+                        if len(content) < 50:
+                            print(f"⚠️  Short response from LLM: '{content}'")
+
+                        return content
+
+            except aiohttp.ClientError as e:
+                print(f"❌ Network error: {e}")
+                if attempt < retry_count - 1:
+                    print(f"   Retrying... ({attempt + 1}/{retry_count})")
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                raise Exception(f"Network error after {retry_count} attempts: {e}")
+
+            except json.JSONDecodeError as e:
+                print(f"❌ JSON decode error: {e}")
+                if attempt < retry_count - 1:
+                    print(f"   Retrying... ({attempt + 1}/{retry_count})")
+                    await asyncio.sleep(2 ** attempt)
+                    continue
+                raise Exception(f"JSON decode error after {retry_count} attempts: {e}")
+
+        raise Exception(f"Failed after {retry_count} retry attempts")
 
     async def analyze_batch(
         self, texts: List[str], system_prompt: str, temperature: float = 0.7

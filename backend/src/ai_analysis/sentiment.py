@@ -54,19 +54,49 @@ Consider:
                 messages, temperature=0.3  # Low temperature for consistency
             )
 
+            # Debug: Log raw response
+            print(f"📝 Raw LLM response (first 200 chars): {response[:200]}")
+
             # Parse JSON response
             import json
+            import re
 
-            result = json.loads(response)
+            # Try to extract JSON from response (in case there's extra text)
+            json_match = re.search(r'\{[^{}]*"score"[^{}]*\}', response)
+            if json_match:
+                json_str = json_match.group(0)
+                result = json.loads(json_str)
+            else:
+                # Try parsing the whole response
+                result = json.loads(response)
+
+            # Validate result structure
+            required_keys = ["score", "label", "confidence", "reasoning"]
+            for key in required_keys:
+                if key not in result:
+                    print(f"⚠️  Missing key '{key}' in response, using default")
+                    result[key] = {"score": 50, "label": "neutral", "confidence": 0.0, "reasoning": "Missing key"}[key]
+
             return result
 
-        except Exception as e:
-            print(f"Error analyzing sentiment: {e}")
+        except json.JSONDecodeError as e:
+            print(f"❌ JSON parse error: {e}")
+            print(f"   Response was: {response[:300]}")
             return {
                 "score": 50,
                 "label": "neutral",
                 "confidence": 0.0,
-                "reasoning": "Analysis failed",
+                "reasoning": "JSON parse failed",
+            }
+        except Exception as e:
+            print(f"❌ Error analyzing sentiment: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "score": 50,
+                "label": "neutral",
+                "confidence": 0.0,
+                "reasoning": f"Analysis failed: {str(e)}",
             }
 
     async def analyze_batch(self, texts: List[str]) -> List[Dict]:
@@ -83,20 +113,29 @@ Consider:
         batch_size = 10
         results = []
 
+        print(f"📊 Processing {len(texts)} texts in batches of {batch_size}...")
+
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
+            batch_num = i // batch_size + 1
+            total_batches = (len(texts) + batch_size - 1) // batch_size
+
+            print(f"🔄 Processing batch {batch_num}/{total_batches} ({len(batch)} texts)...")
 
             # Create batch prompt
             batch_prompt = f"{self.system_prompt}\n\n"
             batch_prompt += (
-                "Analyze these texts and return a JSON array of sentiment objects:\n"
+                "Analyze these texts and return ONLY a JSON array of sentiment objects:\n"
             )
+            batch_prompt += "Format: [{\"score\": 0-100, \"label\": \"positive|negative|neutral\", \"confidence\": 0-1, \"reasoning\": \"...\"}, ...]\n\n"
 
             for j, text in enumerate(batch, 1):
-                batch_prompt += f"\n{j}. {text[:500]}"
+                # Truncate long texts to avoid token limit
+                truncated_text = text[:500] if len(text) > 500 else text
+                batch_prompt += f"{j}. {truncated_text}\n"
 
             messages = [
-                {"role": "system", "content": "You are a sentiment analysis expert."},
+                {"role": "system", "content": "You are a sentiment analysis expert. Always respond with valid JSON only."},
                 {"role": "user", "content": batch_prompt},
             ]
 
@@ -105,19 +144,34 @@ Consider:
                     messages, temperature=0.3
                 )
 
+                print(f"📝 Batch {batch_num} response received (length: {len(response)} chars)")
+
                 # Parse JSON array response
                 import json
+                import re
 
-                batch_results = json.loads(response)
-                results.extend(batch_results)
+                # Try to extract JSON array from response
+                json_match = re.search(r'\[.*\]', response, re.DOTALL)
+                if json_match:
+                    json_str = json_match.group(0)
+                    batch_results = json.loads(json_str)
+                    results.extend(batch_results)
+                    print(f"✓ Batch {batch_num} completed: {len(batch_results)} results")
+                else:
+                    # Try parsing the whole response
+                    batch_results = json.loads(response)
+                    results.extend(batch_results)
+                    print(f"✓ Batch {batch_num} completed: {len(batch_results)} results")
 
             except Exception as e:
-                print(f"Error in batch analysis: {e}")
+                print(f"❌ Error in batch {batch_num} analysis: {e}")
+                print(f"   Falling back to individual analysis for this batch...")
                 # Fallback to individual analysis
                 for text in batch:
                     result = await self.analyze_sentiment(text)
                     results.append(result)
 
+        print(f"✅ Batch analysis completed: {len(results)} total results")
         return results
 
     def calculate_overall_sentiment(self, sentiment_scores: List[float]) -> float:
