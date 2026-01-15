@@ -2,7 +2,7 @@
 """
 观点聚类模块 V2 测试文件
 
-测试 OpinionClustererV2 的各项功能：
+测试 OpinionClusterer 的各项功能：
 - 观点聚类
 - 垃圾内容过滤
 - Map-Reduce 处理
@@ -64,21 +64,21 @@ def large_posts():
 @pytest.mark.asyncio
 async def test_clustering_initialization():
     """测试聚类器初始化"""
-    from src.ai_analysis.clustering_v2 import OpinionClustererV2
+    from src.ai_analysis.clustering import OpinionClusterer
 
-    clusterer = OpinionClustererV2()
+    clusterer = OpinionClusterer()
     assert clusterer.client is not None
     assert clusterer.logger is not None
 
-    print("✓ OpinionClustererV2 初始化成功")
+    print("✓ OpinionClusterer 初始化成功")
 
 
 @pytest.mark.asyncio
 async def test_spam_detection():
     """测试垃圾内容检测"""
-    from src.ai_analysis.clustering_v2 import OpinionClustererV2
+    from src.ai_analysis.clustering import OpinionClusterer
 
-    clusterer = OpinionClustererV2()
+    clusterer = OpinionClusterer()
 
     # 测试垃圾内容
     spam_content = "Buy now!!! Click here!!!"
@@ -94,9 +94,9 @@ async def test_spam_detection():
 @pytest.mark.asyncio
 async def test_post_filtering(sample_posts):
     """测试帖子过滤"""
-    from src.ai_analysis.clustering_v2 import OpinionClustererV2
+    from src.ai_analysis.clustering import OpinionClusterer
 
-    clusterer = OpinionClustererV2()
+    clusterer = OpinionClusterer()
     filtered = clusterer._filter_posts(sample_posts)
 
     print(f"\n原始帖子: {len(sample_posts)}")
@@ -116,9 +116,9 @@ async def test_post_filtering(sample_posts):
 @pytest.mark.asyncio
 async def test_cluster_merging():
     """测试聚类合并"""
-    from src.ai_analysis.clustering_v2 import OpinionClustererV2
+    from src.ai_analysis.clustering import OpinionClusterer
 
-    clusterer = OpinionClustererV2()
+    clusterer = OpinionClusterer()
 
     # 创建相似聚类
     clusters = [
@@ -163,9 +163,9 @@ async def test_cluster_merging():
 @pytest.mark.asyncio
 async def test_clustering_basic(sample_posts):
     """测试基础聚类功能"""
-    from src.ai_analysis.clustering_v2 import OpinionClustererV2
+    from src.ai_analysis.clustering import OpinionClusterer
 
-    clusterer = OpinionClustererV2()
+    clusterer = OpinionClusterer()
     clusters = await clusterer.cluster_opinions(sample_posts, top_n=3)
 
     print(f"\n找到 {len(clusters)} 个聚类:")
@@ -192,9 +192,9 @@ async def test_clustering_basic(sample_posts):
 @pytest.mark.asyncio
 async def test_clustering_empty_posts():
     """测试空帖子列表"""
-    from src.ai_analysis.clustering_v2 import OpinionClustererV2
+    from src.ai_analysis.clustering import OpinionClusterer
 
-    clusterer = OpinionClustererV2()
+    clusterer = OpinionClusterer()
     clusters = await clusterer.cluster_opinions([], top_n=3)
 
     print(f"\n空帖子聚类结果: {clusters}")
@@ -209,9 +209,9 @@ async def test_clustering_empty_posts():
 @pytest.mark.asyncio
 async def test_clustering_spam_only():
     """测试全部是垃圾内容的情况"""
-    from src.ai_analysis.clustering_v2 import OpinionClustererV2
+    from src.ai_analysis.clustering import OpinionClusterer
 
-    clusterer = OpinionClustererV2()
+    clusterer = OpinionClusterer()
     spam_posts = [
         {"content": "Buy now!!!", "author": "spammer1"},
         {"content": "Click here!!!", "author": "spammer2"},
@@ -232,9 +232,9 @@ async def test_clustering_spam_only():
 @pytest.mark.asyncio
 async def test_clustering_large_dataset(large_posts):
     """测试大数据集聚类"""
-    from src.ai_analysis.clustering_v2 import OpinionClustererV2
+    from src.ai_analysis.clustering import OpinionClusterer
 
-    clusterer = OpinionClustererV2()
+    clusterer = OpinionClusterer()
 
     print(f"\n聚类 {len(large_posts)} 条帖子...")
 
@@ -258,9 +258,9 @@ async def test_clustering_large_dataset(large_posts):
 @pytest.mark.asyncio
 async def test_clustering_with_map_reduce():
     """测试 Map-Reduce 模式聚类"""
-    from src.ai_analysis.clustering_v2 import OpinionClustererV2
+    from src.ai_analysis.clustering import OpinionClusterer
 
-    clusterer = OpinionClustererV2()
+    clusterer = OpinionClusterer()
 
     # 创建大数据集
     posts = [
@@ -288,9 +288,9 @@ async def test_clustering_with_map_reduce():
 @pytest.mark.asyncio
 async def test_clustering_different_top_n(sample_posts):
     """测试不同的 top_n 参数"""
-    from src.ai_analysis.clustering_v2 import OpinionClustererV2
+    from src.ai_analysis.clustering import OpinionClusterer
 
-    clusterer = OpinionClustererV2()
+    clusterer = OpinionClusterer()
 
     for top_n in [1, 2, 3, 5]:
         clusters = await clusterer.cluster_opinions(sample_posts, top_n=top_n)
@@ -306,9 +306,9 @@ async def test_clustering_different_top_n(sample_posts):
 @pytest.mark.asyncio
 async def test_clustering_token_tracking():
     """测试 Token 追踪"""
-    from src.ai_analysis.clustering_v2 import OpinionClustererV2
+    from src.ai_analysis.clustering import OpinionClusterer
 
-    clusterer = OpinionClustererV2()
+    clusterer = OpinionClusterer()
 
     # 重置追踪
     clusterer.logger.reset_token_tracking()

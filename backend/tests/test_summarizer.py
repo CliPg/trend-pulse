@@ -2,7 +2,7 @@
 """
 摘要生成模块 V2 测试文件
 
-测试 SummarizerV2 的各项功能：
+测试 Summarizer 的各项功能：
 - 讨论摘要生成
 - 关键点提取
 - Map-Reduce 长文本处理
@@ -68,21 +68,21 @@ def large_posts():
 @pytest.mark.asyncio
 async def test_summarizer_initialization():
     """测试摘要器初始化"""
-    from src.ai_analysis.summarizer_v2 import SummarizerV2
+    from src.ai_analysis.summarizer import Summarizer
 
-    summarizer = SummarizerV2()
+    summarizer = Summarizer()
     assert summarizer.client is not None
     assert summarizer.logger is not None
 
-    print("✓ SummarizerV2 初始化成功")
+    print("✓ Summarizer 初始化成功")
 
 
 @pytest.mark.asyncio
 async def test_sentiment_description():
     """测试情感描述映射"""
-    from src.ai_analysis.summarizer_v2 import SummarizerV2
+    from src.ai_analysis.summarizer import Summarizer
 
-    summarizer = SummarizerV2()
+    summarizer = Summarizer()
 
     test_cases = [
         (90, "very positive"),
@@ -103,9 +103,9 @@ async def test_sentiment_description():
 @pytest.mark.asyncio
 async def test_post_filtering():
     """测试帖子过滤"""
-    from src.ai_analysis.summarizer_v2 import SummarizerV2
+    from src.ai_analysis.summarizer import Summarizer
 
-    summarizer = SummarizerV2()
+    summarizer = Summarizer()
 
     posts = [
         {"content": "Good product with nice features"},
@@ -135,9 +135,9 @@ async def test_post_filtering():
 @pytest.mark.asyncio
 async def test_summarization_basic(sample_posts):
     """测试基础摘要生成"""
-    from src.ai_analysis.summarizer_v2 import SummarizerV2
+    from src.ai_analysis.summarizer import Summarizer
 
-    summarizer = SummarizerV2()
+    summarizer = Summarizer()
     sentiment_score = 75.0
 
     summary = await summarizer.summarize_discussion(sample_posts, sentiment_score)
@@ -157,9 +157,9 @@ async def test_summarization_basic(sample_posts):
 @pytest.mark.asyncio
 async def test_summarization_different_sentiments(sample_posts):
     """测试不同情感分数的摘要"""
-    from src.ai_analysis.summarizer_v2 import SummarizerV2
+    from src.ai_analysis.summarizer import Summarizer
 
-    summarizer = SummarizerV2()
+    summarizer = Summarizer()
 
     sentiments = [20.0, 50.0, 80.0]
 
@@ -179,9 +179,9 @@ async def test_summarization_different_sentiments(sample_posts):
 @pytest.mark.asyncio
 async def test_summarization_empty_posts():
     """测试空帖子列表"""
-    from src.ai_analysis.summarizer_v2 import SummarizerV2
+    from src.ai_analysis.summarizer import Summarizer
 
-    summarizer = SummarizerV2()
+    summarizer = Summarizer()
     summary = await summarizer.summarize_discussion([], 50.0)
 
     print(f"\n空帖子摘要: {summary}")
@@ -197,9 +197,9 @@ async def test_summarization_empty_posts():
 @pytest.mark.asyncio
 async def test_summarization_all_short_posts():
     """测试全是短帖子的场景"""
-    from src.ai_analysis.summarizer_v2 import SummarizerV2
+    from src.ai_analysis.summarizer import Summarizer
 
-    summarizer = SummarizerV2()
+    summarizer = Summarizer()
 
     short_posts = [
         {"content": "Good"},
@@ -221,9 +221,9 @@ async def test_summarization_all_short_posts():
 @pytest.mark.asyncio
 async def test_summarization_with_map_reduce():
     """测试 Map-Reduce 模式摘要"""
-    from src.ai_analysis.summarizer_v2 import SummarizerV2
+    from src.ai_analysis.summarizer import Summarizer
 
-    summarizer = SummarizerV2()
+    summarizer = Summarizer()
 
     # 创建长文本
     long_posts = [
@@ -253,9 +253,9 @@ async def test_summarization_with_map_reduce():
 @pytest.mark.asyncio
 async def test_extract_key_points(sample_posts):
     """测试关键点提取"""
-    from src.ai_analysis.summarizer_v2 import SummarizerV2
+    from src.ai_analysis.summarizer import Summarizer
 
-    summarizer = SummarizerV2()
+    summarizer = Summarizer()
 
     key_points = await summarizer.extract_key_points(sample_posts, max_points=5)
 
@@ -278,9 +278,9 @@ async def test_extract_key_points(sample_posts):
 @pytest.mark.asyncio
 async def test_summarization_large_dataset(large_posts):
     """测试大数据集摘要"""
-    from src.ai_analysis.summarizer_v2 import SummarizerV2
+    from src.ai_analysis.summarizer import Summarizer
 
-    summarizer = SummarizerV2()
+    summarizer = Summarizer()
 
     print(f"\n处理 {len(large_posts)} 条帖子...")
 
@@ -300,9 +300,9 @@ async def test_summarization_large_dataset(large_posts):
 @pytest.mark.asyncio
 async def test_summarization_diverse_opinions(diverse_posts):
     """测试多样化观点的摘要"""
-    from src.ai_analysis.summarizer_v2 import SummarizerV2
+    from src.ai_analysis.summarizer import Summarizer
 
-    summarizer = SummarizerV2()
+    summarizer = Summarizer()
 
     print(f"\n处理 {len(diverse_posts)} 条多样化观点帖子...")
 
@@ -324,9 +324,9 @@ async def test_summarization_diverse_opinions(diverse_posts):
 @pytest.mark.asyncio
 async def test_summarization_token_tracking():
     """测试 Token 追踪"""
-    from src.ai_analysis.summarizer_v2 import SummarizerV2
+    from src.ai_analysis.summarizer import Summarizer
 
-    summarizer = SummarizerV2()
+    summarizer = Summarizer()
 
     # 重置追踪
     summarizer.logger.reset_token_tracking()
@@ -353,9 +353,9 @@ async def test_summarization_token_tracking():
 @pytest.mark.asyncio
 async def test_summarization_quality():
     """测试摘要质量"""
-    from src.ai_analysis.summarizer_v2 import SummarizerV2
+    from src.ai_analysis.summarizer import Summarizer
 
-    summarizer = SummarizerV2()
+    summarizer = Summarizer()
 
     # 创建有明显主题的帖子
     themed_posts = [
@@ -388,9 +388,9 @@ async def test_summarization_quality():
 async def test_summarization_performance():
     """测试摘要生成性能"""
     import time
-    from src.ai_analysis.summarizer_v2 import SummarizerV2
+    from src.ai_analysis.summarizer import Summarizer
 
-    summarizer = SummarizerV2()
+    summarizer = Summarizer()
 
     # 测试小数据集性能
     small_posts = [{"content": f"Test post {i}"} for i in range(5)]

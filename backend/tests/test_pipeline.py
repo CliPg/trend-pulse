@@ -2,7 +2,7 @@
 """
 AI 分析管道 V2 测试文件
 
-测试 AnalysisPipelineV2 的完整功能：
+测试 AnalysisPipeline 的完整功能：
 - 端到端分析流程
 - 模块组合
 - Token 追踪
@@ -80,31 +80,31 @@ def large_posts():
 @pytest.mark.asyncio
 async def test_pipeline_initialization():
     """测试管道初始化"""
-    from src.ai_analysis.pipeline_v2 import AnalysisPipelineV2
+    from src.ai_analysis.pipeline import AnalysisPipeline
 
     # 测试默认初始化
-    pipeline = AnalysisPipelineV2()
+    pipeline = AnalysisPipeline()
     assert pipeline.sentiment_analyzer is not None
     assert pipeline.opinion_clusterer is not None
     assert pipeline.summarizer is not None
 
     # 测试指定 provider
-    pipeline_openai = AnalysisPipelineV2(provider="openai")
+    pipeline_openai = AnalysisPipeline(provider="openai")
     assert pipeline_openai.sentiment_analyzer is not None
 
     # 测试启用 Map-Reduce
-    pipeline_map_reduce = AnalysisPipelineV2(use_map_reduce=True)
+    pipeline_map_reduce = AnalysisPipeline(use_map_reduce=True)
     assert pipeline_map_reduce.use_map_reduce == True
 
-    print("✓ AnalysisPipelineV2 初始化成功")
+    print("✓ AnalysisPipeline 初始化成功")
 
 
 @pytest.mark.asyncio
 async def test_pipeline_reset_tracking():
     """测试重置 Token 追踪"""
-    from src.ai_analysis.pipeline_v2 import AnalysisPipelineV2
+    from src.ai_analysis.pipeline import AnalysisPipeline
 
-    pipeline = AnalysisPipelineV2()
+    pipeline = AnalysisPipeline()
 
     # 重置追踪
     pipeline.reset_tracking()
@@ -121,9 +121,9 @@ async def test_pipeline_reset_tracking():
 @pytest.mark.asyncio
 async def test_pipeline_full_analysis(sample_posts):
     """测试完整分析流程"""
-    from src.ai_analysis.pipeline_v2 import AnalysisPipelineV2
+    from src.ai_analysis.pipeline import AnalysisPipeline
 
-    pipeline = AnalysisPipelineV2()
+    pipeline = AnalysisPipeline()
 
     print(f"\n分析 {len(sample_posts)} 条帖子...")
 
@@ -167,9 +167,9 @@ async def test_pipeline_full_analysis(sample_posts):
 @pytest.mark.asyncio
 async def test_pipeline_empty_posts():
     """测试空帖子列表"""
-    from src.ai_analysis.pipeline_v2 import AnalysisPipelineV2
+    from src.ai_analysis.pipeline import AnalysisPipeline
 
-    pipeline = AnalysisPipelineV2()
+    pipeline = AnalysisPipeline()
     result = await pipeline.analyze_posts([])
 
     print(f"\n空帖子分析结果:")
@@ -189,9 +189,9 @@ async def test_pipeline_empty_posts():
 @pytest.mark.asyncio
 async def test_pipeline_sentiment_only(sample_posts):
     """测试仅情感分析模式"""
-    from src.ai_analysis.pipeline_v2 import AnalysisPipelineV2
+    from src.ai_analysis.pipeline import AnalysisPipeline
 
-    pipeline = AnalysisPipelineV2()
+    pipeline = AnalysisPipeline()
 
     result = await pipeline.analyze_sentiment_only(sample_posts)
 
@@ -215,9 +215,9 @@ async def test_pipeline_sentiment_only(sample_posts):
 @pytest.mark.asyncio
 async def test_pipeline_with_options(sample_posts):
     """测试带选项的分析"""
-    from src.ai_analysis.pipeline_v2 import AnalysisPipelineV2
+    from src.ai_analysis.pipeline import AnalysisPipeline
 
-    pipeline = AnalysisPipelineV2()
+    pipeline = AnalysisPipeline()
 
     # 跳过聚类
     result = await pipeline.analyze_posts(sample_posts, options={
@@ -253,9 +253,9 @@ async def test_pipeline_with_options(sample_posts):
 @pytest.mark.asyncio
 async def test_pipeline_with_map_reduce():
     """测试 Map-Reduce 模式"""
-    from src.ai_analysis.pipeline_v2 import AnalysisPipelineV2
+    from src.ai_analysis.pipeline import AnalysisPipeline
 
-    pipeline = AnalysisPipelineV2(use_map_reduce=True)
+    pipeline = AnalysisPipeline(use_map_reduce=True)
 
     # 创建大数据集
     large_dataset = [
@@ -282,9 +282,9 @@ async def test_pipeline_with_map_reduce():
 @pytest.mark.asyncio
 async def test_pipeline_large_dataset(large_posts):
     """测试大数据集处理"""
-    from src.ai_analysis.pipeline_v2 import AnalysisPipelineV2
+    from src.ai_analysis.pipeline import AnalysisPipeline
 
-    pipeline = AnalysisPipelineV2()
+    pipeline = AnalysisPipeline()
 
     print(f"\n处理 {len(large_posts)} 条帖子...")
 
@@ -309,7 +309,7 @@ async def test_pipeline_large_dataset(large_posts):
 @pytest.mark.asyncio
 async def test_pipeline_different_providers(sample_posts):
     """测试不同提供商"""
-    from src.ai_analysis.pipeline_v2 import AnalysisPipelineV2
+    from src.ai_analysis.pipeline import AnalysisPipeline
 
     providers = ["openai", "tongyi"]
 
@@ -317,7 +317,7 @@ async def test_pipeline_different_providers(sample_posts):
         print(f"\n测试 provider: {provider}")
 
         try:
-            pipeline = AnalysisPipelineV2(provider=provider)
+            pipeline = AnalysisPipeline(provider=provider)
             result = await pipeline.analyze_sentiment_only(sample_posts)
 
             print(f"  整体情感: {result['overall_sentiment']:.1f}/100")
@@ -331,9 +331,9 @@ async def test_pipeline_different_providers(sample_posts):
 @pytest.mark.asyncio
 async def test_pipeline_result_structure(sample_posts):
     """测试结果结构的完整性"""
-    from src.ai_analysis.pipeline_v2 import AnalysisPipelineV2
+    from src.ai_analysis.pipeline import AnalysisPipeline
 
-    pipeline = AnalysisPipelineV2()
+    pipeline = AnalysisPipeline()
     result = await pipeline.analyze_posts(sample_posts)
 
     print(f"\n验证结果结构:")
@@ -370,9 +370,9 @@ async def test_pipeline_result_structure(sample_posts):
 @pytest.mark.asyncio
 async def test_pipeline_sentiment_distribution(sample_posts):
     """测试情感分布"""
-    from src.ai_analysis.pipeline_v2 import AnalysisPipelineV2
+    from src.ai_analysis.pipeline import AnalysisPipeline
 
-    pipeline = AnalysisPipelineV2()
+    pipeline = AnalysisPipeline()
     result = await pipeline.analyze_posts(sample_posts)
 
     # 统计情感分布
@@ -401,9 +401,9 @@ async def test_pipeline_sentiment_distribution(sample_posts):
 async def test_pipeline_performance():
     """测试管道性能"""
     import time
-    from src.ai_analysis.pipeline_v2 import AnalysisPipelineV2
+    from src.ai_analysis.pipeline import AnalysisPipeline
 
-    pipeline = AnalysisPipelineV2()
+    pipeline = AnalysisPipeline()
 
     # 测试小数据集
     small_posts = [{"content": f"Test post {i}"} for i in range(5)]
@@ -438,7 +438,7 @@ async def test_pipeline_performance():
 @pytest.mark.asyncio
 async def test_pipeline_end_to_end():
     """端到端测试：模拟真实使用场景"""
-    from src.ai_analysis.pipeline_v2 import AnalysisPipelineV2
+    from src.ai_analysis.pipeline import AnalysisPipeline
 
     print("\n" + "="*60)
     print("端到端测试：模拟真实使用场景")
@@ -483,7 +483,7 @@ async def test_pipeline_end_to_end():
     print(f"主题: MacBook Pro M3 Max\n")
 
     # 执行分析
-    pipeline = AnalysisPipelineV2(provider="openai")
+    pipeline = AnalysisPipeline(provider="openai")
     result = await pipeline.analyze_posts(reddit_posts)
 
     # 显示结果

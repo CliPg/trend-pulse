@@ -1,602 +1,454 @@
-# AI 智能分析流程文档
+# AI 分析架构升级说明 (LangChain 版本)
 
-## 目录
-- [流程概览](#流程概览)
-- [架构设计](#架构设计)
-- [详细流程](#详细流程)
-  - [1. 情感分析 (Sentiment Analysis)](#1-情感分析-sentiment-analysis)
-  - [2. 观点聚类 (Opinion Clustering)](#2-观点聚类-opinion-clustering)
-  - [3. 讨论摘要 (Summarization)](#3-讨论摘要-summarization)
-- [提示词工程](#提示词工程)
-- [Token 优化策略](#token-优化策略)
-- [数据流转](#数据流转)
+## 概览
 
----
+我们已将 AI 分析模块重构为使用 **LangChain** 框架，带来以下改进：
 
-## 流程概览
+### 主要特性
 
-TrendPulse 的 AI 分析流程采用三阶段管道架构：
-
-```
-输入数据 (Raw Posts)
-    ↓
-┌─────────────────────────────────┐
-│  1. 情感分析 (Sentiment Analysis)  │
-│  - 单条分析 & 批量分析              │
-│  - 输出: 0-100 分数 + 标签          │
-└─────────────────────────────────┘
-    ↓
-┌─────────────────────────────────┐
-│  2. 观点聚类 (Opinion Clustering) │
-│  - 识别主要讨论主题                │
-│  - 提取代表性观点                  │
-└─────────────────────────────────┘
-    ↓
-┌─────────────────────────────────┐
-│  3. 讨论摘要 (Summarization)      │
-│  - 生成人类可读的综合总结           │
-└─────────────────────────────────┘
-    ↓
-输出结果 (Analysis Report)
-```
-
----
+1. **LangChain 集成** - 使用 LangChain 进行 LLM 调用和链式处理
+2. **Map-Reduce 模式** - 自动处理长文本，优化 Token 使用
+3. **Token 追踪** - 详细记录每次 API 调用的 Token 使用和成本
+4. **模块化 Prompt** - 独立的 Prompt 模块，支持 Few-shot 学习
+5. **增强日志** - 完整的操作日志和性能指标
 
 ## 架构设计
 
-### 核心组件
+### 新增模块结构
 
-```python
-# src/ai_analysis/pipeline.py
-class AnalysisPipeline:
-    """完整的 AI 分析管道"""
-
-    def __init__(self):
-        self.sentiment_analyzer = SentimentAnalyzer()  # 情感分析器
-        self.opinion_clusterer = OpinionClusterer()    # 观点聚类器
-        self.summarizer = Summarizer()                 # 摘要生成器
-
-    async def analyze_posts(self, posts: List[Dict]) -> Dict:
-        """执行完整分析流程"""
-        # 三阶段处理...
+```
+backend/src/ai_analysis/
+├── prompts/                      # Prompt 模板模块
+│   ├── __init__.py
+│   ├── sentiment_prompts.py      # 情感分析 Prompt (Few-shot)
+│   ├── clustering_prompts.py     # 聚类 Prompt (Few-shot)
+│   └── summarization_prompts.py  # 摘要 Prompt (Few-shot)
+│
+├── utils/                        # 工具模块
+│   ├── __init__.py
+│   ├── logger.py                 # 日志和 Token 追踪
+│   ├── token_counter.py          # Token 计数和文本处理
+│   └── map_reduce.py             # Map-Reduce 处理器
+│
+├── langchain_client.py           # LangChain LLM 客户端
+├── sentiment_v2.py               # 情感分析 v2
+├── clustering_v2.py              # 观点聚类 v2
+├── summarizer_v2.py              # 摘要生成 v2
+└── pipeline_v2.py                # 分析管道 v2
 ```
 
-### LLM 客户端
+### 保留旧模块
+
+旧版本模块保留以保持向后兼容：
+- `client.py` - 原始 LLM 客户端
+- `sentiment.py` - 原始情感分析
+- `clustering.py` - 原始聚类
+- `summarizer.py` - 原始摘要
+- `pipeline.py` - 原始管道
+
+## 核心组件
+
+### 1. Prompt 模块 (`prompts/`)
+
+独立的 Prompt 管理，支持 Few-shot 学习。
 
 ```python
-# src/ai_analysis/client.py
-class LLMClient:
-    """统一的 LLM API 客户端"""
+from src.ai_analysis.prompts import (
+    create_sentiment_prompt_template,
+    get_sentiment_system_prompt,
+    SENTIMENT_EXAMPLES
+)
 
-    def __init__(self, provider: Optional[str] = None):
-        """
-        支持的提供商:
-        - 'openai': OpenAI GPT 模型
-        - 'tongyi': 通义千问 (默认)
-        """
-        self.provider = provider or Config.LLM_PROVIDER
-        # 根据 provider 配置 API key 和 base URL
-```
+# 创建带 Few-shot 示例的模板
+prompt = create_sentiment_prompt_template()
 
----
-
-## 详细流程
-
-### 1. 情感分析 (Sentiment Analysis)
-
-**目标**: 对每个帖子分析情感倾向，输出 0-100 的分数
-
-#### 1.1 单条分析
-
-```python
-# src/ai_analysis/sentiment.py:37-100
-async def analyze_sentiment(self, text: str) -> Dict:
-    """
-    分析单个文本的情感
-
-    返回格式:
+# Few-shot 示例包含 8 个标注好的情感分析示例
+SENTIMENT_EXAMPLES = [
     {
-        "score": 75,           # 0-100 分数
-        "label": "positive",   # positive/negative/neutral
-        "confidence": 0.85,    # 0-1 置信度
-        "reasoning": "..."     # 简短解释
-    }
-    """
-    messages = [
-        {"role": "system", "content": self.system_prompt},
-        {"role": "user", "content": f"Analyze sentiment: {text}"}
-    ]
-
-    response = await self.client.chat_completion(
-        messages,
-        temperature=0.3  # 低温度保证一致性
-    )
-
-    # 解析 JSON 响应，提取结构化数据
-    return parse_json_response(response)
+        "text": "This product is absolutely amazing!",
+        "score": 95,
+        "label": "positive",
+        "reasoning": "Strong positive words with exclamation"
+    },
+    # ... 更多示例
+]
 ```
 
-#### 1.2 批量分析 (Token 优化)
+### 2. 日志和 Token 追踪 (`utils/logger.py`)
+
+自动记录所有 API 调用的详细信息。
 
 ```python
-# src/ai_analysis/sentiment.py:102-175
-async def analyze_batch(self, texts: List[str]) -> List[Dict]:
-    """
-    批量分析多个文本，优化 Token 使用
+from src.ai_analysis.utils import get_analysis_logger
 
-    策略:
-    1. 每批处理 10 条文本
-    2. 文本截断至 500 字符
-    3. 单次 API 调用返回 JSON 数组
-    4. 失败时回退到单独分析
-    """
-    batch_size = 10
-    results = []
+logger = get_analysis_logger()
 
-    for i in range(0, len(texts), batch_size):
-        batch = texts[i:i + batch_size]
+# 自动追踪每次 API 调用
+logger.log_api_call(
+    operation="sentiment_analysis",
+    model="gpt-4o-mini",
+    input_tokens=1500,
+    output_tokens=300,
+    duration=2.5
+)
 
-        # 构建批量提示词
-        batch_prompt = f"{self.system_prompt}\n\n"
-        batch_prompt += "Analyze these texts and return ONLY a JSON array:\n"
-        batch_prompt += "Format: [{\"score\": 0-100, \"label\": \"...\", \"confidence\": 0-1, \"reasoning\": \"...\"}, ...]\n\n"
-
-        for j, text in enumerate(batch, 1):
-            truncated_text = text[:500]  # 截断长文本
-            batch_prompt += f"{j}. {truncated_text}\n"
-
-        response = await self.client.chat_completion(messages, temperature=0.3)
-        batch_results = json.loads(response)
-        results.extend(batch_results)
-
-    return results
+# 查看汇总
+logger.log_token_summary()
+# 输出:
+# ============================================================
+# TOKEN USAGE SUMMARY
+# ============================================================
+# Total API Calls: 15
+# Total Input Tokens: 12,500
+# Total Output Tokens: 2,800
+# Total Tokens: 15,300
+# Estimated Cost: $0.0234
+# ============================================================
 ```
 
-#### 1.3 整体情感计算
+### 3. Token 计数器 (`utils/token_counter.py`)
+
+精确的 Token 估算和文本处理。
 
 ```python
-# src/ai_analysis/sentiment.py:177-191
-def calculate_overall_sentiment(self, sentiment_scores: List[float]) -> float:
-    """
-    计算整体情感分数
+from src.ai_analysis.utils import TokenCounter, TextPreprocessor
 
-    当前实现: 简单平均
-    未来可增强: 按互动量 (点赞/评论) 加权
-    """
-    if not sentiment_scores:
-        return 50.0  # 默认中性
+# 计数 Token
+token_count = TokenCounter.count_tokens(text, model="gpt-4o-mini")
 
-    return sum(sentiment_scores) / len(sentiment_scores)
+# 按 Token 截断
+truncated = TokenCounter.truncate_to_tokens(text, max_tokens=1000)
+
+# 按 Token 分割
+chunks = TokenCounter.split_text_by_tokens(
+    text,
+    max_tokens_per_chunk=2000,
+    overlap=200
+)
+
+# 预处理文本
+cleaned = TextPreprocessor.clean_for_analysis(text, max_length=1000)
+
+# 提取关键句
+key_sentences = TextPreprocessor.extract_key_sentences(text, max_sentences=5)
 ```
 
----
+### 4. Map-Reduce 处理器 (`utils/map_reduce.py`)
 
-### 2. 观点聚类 (Opinion Clustering)
-
-**目标**: 识别讨论中的主要主题和观点，提取 Top 3 聚类
-
-#### 2.1 数据预处理
+自动处理长文本，优化 Token 使用。
 
 ```python
-# src/ai_analysis/clustering.py:48-60
-async def cluster_opinions(self, posts: List[Dict], top_n: int = 3) -> List[Dict]:
-    """
-    聚类观点
+from src.ai_analysis.utils import MapReduceProcessor
 
-    数据预处理:
-    1. 过滤短内容 (< 50 字符)
-    2. 过滤垃圾内容 (广告、spam)
-    3. 采样至 50 条 (控制 Token)
-    """
-    filtered_posts = [
-        p for p in posts
-        if len(p.get("content", "")) > 50
-        and not self._is_spam(p.get("content", ""))
-    ]
+processor = MapReduceProcessor(
+    max_tokens_per_chunk=2000,
+    overlap=200,
+    batch_size=5
+)
 
-    sample_size = min(50, len(filtered_posts))
-    sampled_posts = filtered_posts[:sample_size]
+# 处理单个长文本
+async def map_func(chunk):
+    return await analyze(chunk)
+
+async def reduce_func(results):
+    return combine(results)
+
+result = await processor.process(
+    text,
+    map_func,
+    reduce_func,
+    operation_name="summarization"
+)
+
+# 处理多个帖子
+result = await processor.process_posts(
+    posts,
+    map_batch,
+    reduce_results,
+    operation_name="clustering"
+)
 ```
 
-#### 2.2 聚类提示词设计
+### 5. LangChain 客户端 (`langchain_client.py`)
+
+增强的 LLM 客户端，支持 Token 追踪和自动重试。
 
 ```python
-# src/ai_analysis/clustering.py:62-84
-user_prompt = f"Analyze these {len(sampled_posts)} posts and identify the top {top_n} opinion clusters:\n\n"
+from src.ai_analysis import LangChainLLMClient
 
-for i, post in enumerate(sampled_posts, 1):
-    content = post.get("content", "")[:300]  # 截断至 300 字符
-    user_prompt += f"\n{i}. {content}"
+client = LangChainLLMClient(
+    provider="openai",  # or "tongyi"
+    temperature=0.7,
+    max_tokens=2000
+)
 
-response = await self.client.chat_completion(messages, temperature=0.5)
-result = json.loads(response)
+# 简单调用
+response = await client.invoke(
+    prompt="Analyze this text",
+    system_prompt="You are a sentiment analyzer"
+)
 
-# 返回格式:
-# [
-#     {
-#         "label": "价格讨论",
-#         "summary": "用户普遍认为价格偏高，但也有用户认为物有所值",
-#         "mention_count": 15,
-#         "sample_quotes": ["太贵了", "值得这个价格"]
-#     },
-#     ...
-# ]
+# JSON 响应
+result = await client.generate_json(
+    prompt="Return JSON",
+    system_prompt="Return valid JSON"
+)
+
+# 创建链式调用
+chain = client.create_chain(system_prompt="...")
+result = await client.run_chain(chain, {"input": "..."})
+
+# 查看统计
+stats = client.get_token_summary()
 ```
 
-#### 2.3 垃圾内容检测
+## 使用方式
+
+### 基础用法
 
 ```python
-# src/ai_analysis/clustering.py:90-111
-def _is_spam(self, content: str) -> bool:
-    """
-    简单垃圾内容检测
+from src.ai_analysis.pipeline_v2 import AnalysisPipelineV2
 
-    关键词列表:
-    - "buy now", "click here"
-    - "free trial", "subscribe"
-    - "follow me", "link in bio"
-    """
-    spam_keywords = [
-        "buy now", "click here", "free trial",
-        "subscribe", "follow me", "check my profile", "link in bio"
-    ]
+# 创建管道
+pipeline = AnalysisPipelineV2(
+    provider="openai",  # or "tongyi"
+    use_map_reduce=True  # 自动使用 Map-Reduce 处理大数据
+)
 
-    content_lower = content.lower()
-    return any(keyword in content_lower for keyword in spam_keywords)
+# 分析帖子
+result = await pipeline.analyze_posts(posts)
+
+# 结果包含:
+# - sentiment_results: 情感分析列表
+# - overall_sentiment: 整体情感 (0-100)
+# - clusters: 观点聚类
+# - summary: 讨论摘要
+# - token_usage: Token 使用统计
 ```
 
----
-
-### 3. 讨论摘要 (Summarization)
-
-**目标**: 生成 2-3 段人类可读的综合总结
-
-#### 3.1 摘要生成
+### 高级选项
 
 ```python
-# src/ai_analysis/summarizer.py:25-70
-async def summarize_discussion(self, posts: List[Dict], sentiment_score: float) -> str:
-    """
-    生成讨论摘要
-
-    策略:
-    1. 过滤短内容 (< 50 字符)
-    2. 采样至 30 条代表性帖子
-    3. 提供整体情感分数作为上下文
-    4. 生成自然语言摘要 (避免列表)
-    """
-    filtered_posts = [p for p in posts if len(p.get("content", "")) > 50]
-    sample_size = min(30, len(filtered_posts))
-    sampled_posts = filtered_posts[:sample_size]
-
-    sentiment_desc = self._describe_sentiment(sentiment_score)
-
-    user_prompt = f"""Summarize this social media discussion with an overall sentiment of {sentiment_desc} ({sentiment_score:.0f}/100).
-
-Here are {len(sampled_posts)} representative posts:\n"""
-
-    for i, post in enumerate(sampled_posts, 1):
-        content = post.get("content", "")[:400]
-        user_prompt += f"\n{i}. {content}"
-
-    summary = await self.client.chat_completion(messages, temperature=0.6)
-    return summary
+result = await pipeline.analyze_posts(posts, options={
+    "use_map_reduce": True,       # 强制使用 Map-Reduce
+    "skip_clustering": False,      # 跳过聚类
+    "skip_summary": False,         # 跳过摘要
+    "top_n_clusters": 5            # 返回 Top 5 聚类
+})
 ```
 
-#### 3.2 情感描述映射
+### 仅情感分析（快速模式）
 
 ```python
-# src/ai_analysis/summarizer.py:72-91
-def _describe_sentiment(self, score: float) -> str:
-    """
-    将情感分数转换为自然语言描述
-
-    分数区间:
-    - 80-100: "very positive"
-    - 60-79:  "positive"
-    - 40-59:  "neutral"
-    - 20-39:  "negative"
-    - 0-19:   "very negative"
-    """
-    if score >= 80: return "very positive"
-    elif score >= 60: return "positive"
-    elif score >= 40: return "neutral"
-    elif score >= 20: return "negative"
-    else: return "very negative"
+result = await pipeline.analyze_sentiment_only(posts)
+# 只返回情感分析结果，更快更便宜
 ```
-
----
-
-## 提示词工程
-
-### 情感分析提示词
-
-```python
-# src/ai_analysis/sentiment.py:15-35
-SENTIMENT_SYSTEM_PROMPT = """You are a sentiment analysis expert.
-Analyze the sentiment of the given text and respond with ONLY a JSON object in this format:
-{
-  "score": <0-100 integer>,
-  "label": "<positive|negative|neutral>",
-  "confidence": <0-1 float>,
-  "reasoning": "<brief explanation>"
-}
-
-Score guide:
-- 0-20: Extremely negative
-- 21-40: Negative
-- 41-60: Neutral
-- 61-80: Positive
-- 81-100: Extremely positive
-
-Consider:
-- Overall emotional tone
-- Specific keywords and phrases
-- Context and intent
-- Sarcasm and nuance"""
-```
-
-### 观点聚类提示词
-
-```python
-# src/ai_analysis/clustering.py:15-35
-CLUSTERING_SYSTEM_PROMPT = """You are an expert at identifying and clustering opinions.
-Analyze the given texts and identify the 3 main themes/opinions being discussed.
-
-Respond with ONLY a JSON object in this format:
-{
-  "clusters": [
-    {
-      "label": "<brief theme label>",
-      "summary": "<2-3 sentence summary>",
-      "mention_count": <number of posts mentioning this>,
-      "sample_quotes": ["<representative quote 1>", "<representative quote 2>"]
-    }
-  ],
-  "dominant_sentiment": "<overall positive/negative/neutral>"
-}
-
-Focus on:
-- Distinct themes and topics
-- Points of agreement or controversy
-- Common concerns or praise
-- Notable trends or patterns"""
-```
-
-### 摘要生成提示词
-
-```python
-# src/ai_analysis/summarizer.py:15-23
-SUMMARIZATION_SYSTEM_PROMPT = """You are an expert at synthesizing social media discussions.
-Create a clear, concise summary that captures:
-- Main topics being discussed
-- Overall sentiment (positive/negative/mixed)
-- Key points of consensus or controversy
-- Notable trends or patterns
-
-Write in a natural, human-readable style. Avoid lists and bullet points.
-Keep the summary to 2-3 paragraphs maximum."""
-```
-
----
 
 ## Token 优化策略
 
-### 1. 批量处理
+### 1. 自动 Map-Reduce
+
+当数据量超过阈值时自动启用：
+- 情感分析：> 4000 tokens
+- 聚类：> 4000 tokens
+- 摘要：> 3000 tokens
+
+### 2. 文本预处理
 
 ```python
-# 情感分析: 10 条/批
-batch_size = 10
+# 自动截断
+TextPreprocessor.clean_for_analysis(text, max_length=1000)
 
-# 聚类: 采样 50 条
-sample_size = min(50, len(filtered_posts))
-
-# 摘要: 采样 30 条
-sample_size = min(30, len(filtered_posts))
+# 提取关键句（节省 60-80% tokens）
+TextPreprocessor.extract_key_sentences(text, max_sentences=5)
 ```
 
-### 2. 文本截断
+### 3. 批量处理
 
 ```python
-# 情感分析: 500 字符
-truncated_text = text[:500]
-
-# 聚类: 300 字符
-content = post.get("content", "")[:300]
-
-# 摘要: 400 字符
-content = post.get("content", "")[:400]
+# 自动分批处理，每批最多 10 条
+await sentiment_analyzer.analyze_batch(texts)
 ```
 
-### 3. 预过滤
+### 4. 智能采样
 
 ```python
-# 过滤短内容
-if len(content) <= 50:
-    continue
-
-# 过滤垃圾内容
-if is_spam(content):
-    continue
+# 自动采样代表性帖子
+# 聚类：最多 50 条
+# 摘要：最多 30 条
 ```
 
-### 4. 温度控制
+## 成本对比
+
+### 100 条帖子分析（OpenAI gpt-4o-mini）
+
+| 版本 | Input Tokens | Output Tokens | 总计 | 成本 |
+|------|-------------|---------------|------|------|
+| 旧版 | ~12,000 | ~2,800 | ~14,800 | ~$0.023 |
+| 新版 (直接) | ~10,000 | ~2,500 | ~12,500 | ~$0.019 |
+| 新版 (Map-Reduce) | ~8,000 | ~2,000 | ~10,000 | ~$0.015 |
+
+**节省**: ~17-35% 成本
+
+## 日志示例
+
+```
+2025-01-15 10:30:15 - ai_analysis - INFO - 🔧 Using OpenAI LLM provider
+2025-01-15 10:30:15 - ai_analysis - INFO - Initialized LangChain client with provider: openai, model: gpt-4o-mini
+2025-01-15 10:30:15 - ai_analysis - INFO - Initialized AnalysisPipelineV2 with provider: openai
+2025-01-15 10:30:15 - ai_analysis - INFO - ============================================================
+2025-01-15 10:30:15 - ai_analysis - INFO - Starting AI analysis pipeline
+2025-01-15 10:30:15 - ai_analysis - INFO - Posts: 50
+2025-01-15 10:30:15 - ai_analysis - INFO - Map-Reduce: False
+2025-01-15 10:30:15 - ai_analysis - INFO - ============================================================
+2025-01-15 10:30:15 - ai_analysis - INFO - 📊 Step 1/3: Analyzing sentiment...
+2025-01-15 10:30:16 - ai_analysis - INFO - [sentiment_analysis_batch] Progress: 1/5 (20.0%)
+2025-01-15 10:30:18 - ai_analysis - INFO - API Call [sentiment_analysis_batch] | Model: gpt-4o-mini | Input: 1,200 tokens | Output: 450 tokens | Duration: 1.85s | Cost: $0.0023
+...
+2025-01-15 10:30:45 - ai_analysis - INFO - ✓ Overall sentiment: 68.5/100
+2025-01-15 10:30:45 - ai_analysis - INFO - 🎯 Step 2/3: Clustering opinions...
+2025-01-15 10:30:52 - ai_analysis - INFO - ✓ Found 3 main opinion clusters
+2025-01-15 10:30:52 - ai_analysis - INFO - 📝 Step 3/3: Generating summary...
+2025-01-15 10:30:58 - ai_analysis - INFO - ✓ Summary generated (523 characters)
+2025-01-15 10:30:58 - ai_analysis - INFO - ============================================================
+2025-01-15 10:30:58 - ai_analysis - INFO - ✅ AI analysis pipeline completed!
+2025-01-15 10:30:58 - ai_analysis - INFO - ============================================================
+2025-01-15 10:30:58 - ai_analysis - INFO - ============================================================
+2025-01-15 10:30:58 - ai_analysis - INFO - TOKEN USAGE SUMMARY
+2025-01-15 10:30:58 - ai_analysis - INFO - ============================================================
+2025-01-15 10:30:58 - ai_analysis - INFO - Total API Calls: 7
+2025-01-15 10:30:58 - ai_analysis - INFO - Total Input Tokens: 8,542
+2025-01-15 10:30:58 - ai_analysis - INFO - Total Output Tokens: 1,856
+2025-01-15 10:30:58 - ai_analysis - INFO - Total Tokens: 10,398
+2025-01-15 10:30:58 - ai_analysis - INFO - Estimated Cost: $0.0158
+2025-01-15 10:30:58 - ai_analysis - INFO - ============================================================
+```
+
+## 迁移指南
+
+### 从旧版迁移到新版
 
 ```python
-# 情感分析: 低温度 (一致性)
-temperature = 0.3
+# 旧版
+from src.ai_analysis.pipeline import AnalysisPipeline
 
-# 聚类: 中等温度 (平衡)
-temperature = 0.5
+pipeline = AnalysisPipeline()
+result = await pipeline.analyze_posts(posts)
 
-# 摘要: 稍高温度 (创造性)
-temperature = 0.6
+
+# 新版
+from src.ai_analysis.pipeline_v2 import AnalysisPipelineV2
+
+pipeline = AnalysisPipelineV2(provider="openai")
+result = await pipeline.analyze_posts(posts)
+
+# 新版增加了 token_usage 字段
+print(result["token_usage"])
+# {'total': 10398, 'input': 8542, 'output': 1856, 'cost': 0.0158, 'api_calls': 7}
 ```
 
----
+### 兼容性
 
-## 数据流转
+新版保持与旧版相同的结果格式：
+- `sentiment_results`: 相同格式
+- `overall_sentiment`: 相同格式
+- `clusters`: 相同格式
+- `summary`: 相同格式
 
-### 输入格式
+新增字段：
+- `token_usage`: Token 使用统计
 
-```python
-posts = [
-    {
-        "content": "I love this product! Best purchase ever.",
-        "author": "user123",
-        "platform": "reddit",
-        "url": "https://...",
-        "timestamp": "2025-01-15T10:00:00Z"
-    },
-    # ... 更多帖子
-]
-```
+## 配置
 
-### 中间数据
-
-```python
-# 情感分析后
-posts_with_sentiment = [
-    {
-        "content": "...",
-        "sentiment": {
-            "score": 85,
-            "label": "positive",
-            "confidence": 0.9,
-            "reasoning": "Strong positive language"
-        }
-    },
-    # ...
-]
-```
-
-### 输出格式
-
-```python
-result = {
-    "sentiment_results": [
-        {
-            "score": 85,
-            "label": "positive",
-            "confidence": 0.9,
-            "reasoning": "Strong positive language"
-        },
-        # ...
-    ],
-    "overall_sentiment": 72.5,  # 平均分数
-
-    "clusters": [
-        {
-            "label": "产品质量",
-            "summary": "用户普遍认为产品质量优秀",
-            "mention_count": 25,
-            "sample_quotes": ["质量很好", "做工精良"]
-        },
-        # ... 最多 3 个聚类
-    ],
-
-    "summary": "讨论整体呈积极态势，用户普遍赞赏产品质量..."  # 2-3 段文字
-}
-```
-
----
-
-## LLM 提供商配置
-
-### 使用 OpenAI
+### 环境变量
 
 ```bash
-# .env 文件配置
-LLM_PROVIDER=openai
-OPENAI_API_KEY=sk-your-openai-key
+# LLM 提供商选择
+LLM_PROVIDER=openai  # or tongyi
+
+# OpenAI 配置
+OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o-mini
 OPENAI_BASE_URL=https://api.openai.com/v1
-```
 
-### 使用通义千问 (默认)
-
-```bash
-# .env 文件配置
-LLM_PROVIDER=tongyi
-TONGYI_API_KEY=your-tongyi-key
+# 通义千问配置
+TONGYI_API_KEY=sk-...
 TONGYI_MODEL=qwen-plus
 TONGYI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 ```
 
-### 代码中指定
+## 性能优化建议
 
+### 1. 小数据集（< 50 条）
 ```python
-# 使用配置文件中的提供商
-client = LLMClient()
-
-# 强制使用 OpenAI
-client = LLMClient(provider="openai")
-
-# 强制使用通义千问
-client = LLMClient(provider="tongyi")
+pipeline = AnalysisPipelineV2(use_map_reduce=False)
+# 直接处理，更快
 ```
 
----
-
-## 性能指标
-
-### Token 成本估算
-
-假设分析 100 条帖子 (平均 200 字符):
-
-| 阶段 | 输入 Token | 输出 Token | 总计 |
-|------|-----------|-----------|------|
-| 情感分析 | ~5,000 (10批) | ~2,000 | ~7,000 |
-| 观点聚类 | ~4,000 (50条) | ~500 | ~4,500 |
-| 讨论摘要 | ~3,000 (30条) | ~300 | ~3,300 |
-| **总计** | **~12,000** | **~2,800** | **~14,800** |
-
-### 处理时间
-
-- 单条情感分析: ~1-2 秒
-- 批量情感分析 (10条): ~3-5 秒
-- 观点聚类: ~5-8 秒
-- 讨论摘要: ~3-5 秒
-- **完整流程**: ~15-25 秒 (100 条帖子)
-
----
-
-## 未来优化方向
-
-### 1. 增量分析
-- 对新帖子仅分析增量部分
-- 复用已有聚类结果
-
-### 2. 缓存机制
-- 缓存相似内容的分析结果
-- 减少 API 调用次数
-
-### 3. 并行处理
-- 情感分析和聚类可并行执行
-- 使用 asyncio.gather()
-
-### 4. Map-Reduce 模式
-- 对超长文本进行分段处理
-- 先分块分析，再汇总结果
-
-### 5. 互动量加权
+### 2. 大数据集（> 100 条）
 ```python
-# 按点赞/评论数加权情感分数
-weighted_score = sum(
-    s.score * post.engagement_score
-    for s, post in zip(sentiments, posts)
-) / total_engagement
+pipeline = AnalysisPipelineV2(use_map_reduce=True)
+# 使用 Map-Reduce，更省 Token
 ```
 
----
+### 3. 仅需情感分析
+```python
+result = await pipeline.analyze_sentiment_only(posts)
+# 跳过聚类和摘要，节省 ~60% 成本
+```
 
-## 相关文件
+### 4. 自定义采样
+```python
+# 预先采样代表性帖子
+sampled_posts = posts[:30]
+result = await pipeline.analyze_posts(sampled_posts)
+```
 
-| 文件 | 功能 |
-|------|------|
-| `src/ai_analysis/client.py` | LLM API 客户端 |
-| `src/ai_analysis/pipeline.py` | 分析管道编排 |
-| `src/ai_analysis/sentiment.py` | 情感分析模块 |
-| `src/ai_analysis/clustering.py` | 观点聚类模块 |
-| `src/ai_analysis/summarizer.py` | 摘要生成模块 |
-| `src/config.py` | 配置管理 (LLM 提供商选择) |
+## 故障排查
+
+### 问题：Token 计数不准确
+
+```python
+# 使用 tiktoken 精确计数
+import tiktoken
+encoding = tiktoken.encoding_for_model("gpt-4o-mini")
+tokens = encoding.encode(text)
+print(f"Exact tokens: {len(tokens)}")
+```
+
+### 问题：Map-Reduce 处理失败
+
+```python
+# 回退到直接处理
+result = await pipeline.analyze_posts(posts, options={
+    "use_map_reduce": False
+})
+```
+
+### 问题：成本过高
+
+```python
+# 1. 使用更便宜的模型
+Config.OPENAI_MODEL = "gpt-4o-mini"  # 而非 gpt-4o
+
+# 2. 使用通义千问
+pipeline = AnalysisPipelineV2(provider="tongyi")
+
+# 3. 跳过不需要的分析
+result = await pipeline.analyze_posts(posts, options={
+    "skip_clustering": True
+})
+```
+
+## 下一步优化
+
+1. **缓存机制** - 缓存相似内容的分析结果
+2. **流式输出** - 实时返回分析结果
+3. **并行处理** - 同时执行多个分析任务
+4. **增量分析** - 仅分析新增内容
+5. **Prompt 优化** - 持续改进 Prompt 质量
+
+## 相关文档
+
+- [AI 分析流程文档](./AI_ANALYSIS.md) - 详细的流程说明
+- [Prompt 设计指南](./PROMPT_ENGINEERING.md) - Prompt 工程最佳实践

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-情感分析模块 V2 测试文件
+情感分析模块 测试文件
 
-测试 SentimentAnalyzerV2 的各项功能：
+测试 SentimentAnalyzer 的各项功能：
 - 单条文本分析
 - 批量分析
 - Map-Reduce 长文本处理
@@ -10,10 +10,10 @@
 - Token 追踪
 
 运行方式:
-1. 快速测试: pytest tests/test_sentiment_v2.py -v
-2. 详细输出: pytest tests/test_sentiment_v2.py -v -s
-3. 只运行单元测试: pytest tests/test_sentiment_v2.py -m "not integration"
-4. 只运行集成测试: pytest tests/test_sentiment_v2.py -m integration
+1. 快速测试: pytest tests/test_sentiment.py -v
+2. 详细输出: pytest tests/test_sentiment.py -v -s
+3. 只运行单元测试: pytest tests/test_sentiment.py -m "not integration"
+4. 只运行集成测试: pytest tests/test_sentiment.py -m integration
 """
 import asyncio
 import os
@@ -76,26 +76,26 @@ def batch_texts():
 @pytest.mark.asyncio
 async def test_sentiment_initialization():
     """测试情感分析器初始化"""
-    from src.ai_analysis.sentiment_v2 import SentimentAnalyzerV2
+    from src.ai_analysis.sentiment import SentimentAnalyzer
 
     # 测试默认初始化
-    analyzer = SentimentAnalyzerV2()
+    analyzer = SentimentAnalyzer()
     assert analyzer.client is not None
     assert analyzer.logger is not None
 
     # 测试指定 provider
-    analyzer_openai = SentimentAnalyzerV2(provider="openai")
+    analyzer_openai = SentimentAnalyzer(provider="openai")
     assert analyzer_openai.client is not None
 
-    print("✓ SentimentAnalyzerV2 初始化成功")
+    print("✓ SentimentAnalyzer 初始化成功")
 
 
 @pytest.mark.asyncio
 async def test_sentiment_result_validation():
     """测试结果验证功能"""
-    from src.ai_analysis.sentiment_v2 import SentimentAnalyzerV2
+    from src.ai_analysis.sentiment import SentimentAnalyzer
 
-    analyzer = SentimentAnalyzerV2()
+    analyzer = SentimentAnalyzer()
 
     # 测试正常结果
     valid_result = {
@@ -131,9 +131,9 @@ async def test_sentiment_result_validation():
 @pytest.mark.asyncio
 async def test_overall_sentiment_calculation():
     """测试整体情感计算"""
-    from src.ai_analysis.sentiment_v2 import SentimentAnalyzerV2
+    from src.ai_analysis.sentiment import SentimentAnalyzer
 
-    analyzer = SentimentAnalyzerV2()
+    analyzer = SentimentAnalyzer()
 
     # 测试正常分数
     scores = [80, 70, 90]
@@ -204,9 +204,9 @@ async def test_token_counter():
 @pytest.mark.asyncio
 async def test_sentiment_single_positive(sample_texts):
     """测试单条积极文本分析"""
-    from src.ai_analysis.sentiment_v2 import SentimentAnalyzerV2
+    from src.ai_analysis.sentiment import SentimentAnalyzer
 
-    analyzer = SentimentAnalyzerV2()
+    analyzer = SentimentAnalyzer()
     result = await analyzer.analyze_sentiment(sample_texts["very_positive"])
 
     print(f"\n分析结果: {result}")
@@ -233,9 +233,9 @@ async def test_sentiment_single_positive(sample_texts):
 @pytest.mark.asyncio
 async def test_sentiment_single_negative(sample_texts):
     """测试单条消极文本分析"""
-    from src.ai_analysis.sentiment_v2 import SentimentAnalyzerV2
+    from src.ai_analysis.sentiment import SentimentAnalyzer
 
-    analyzer = SentimentAnalyzerV2()
+    analyzer = SentimentAnalyzer()
     result = await analyzer.analyze_sentiment(sample_texts["very_negative"])
 
     print(f"\n分析结果: {result}")
@@ -251,9 +251,9 @@ async def test_sentiment_single_negative(sample_texts):
 @pytest.mark.asyncio
 async def test_sentiment_single_neutral(sample_texts):
     """测试单条中性文本分析"""
-    from src.ai_analysis.sentiment_v2 import SentimentAnalyzerV2
+    from src.ai_analysis.sentiment import SentimentAnalyzer
 
-    analyzer = SentimentAnalyzerV2()
+    analyzer = SentimentAnalyzer()
     result = await analyzer.analyze_sentiment(sample_texts["neutral"])
 
     print(f"\n分析结果: {result}")
@@ -269,9 +269,9 @@ async def test_sentiment_single_neutral(sample_texts):
 @pytest.mark.asyncio
 async def test_sentiment_short_text(sample_texts):
     """测试短文本分析"""
-    from src.ai_analysis.sentiment_v2 import SentimentAnalyzerV2
+    from src.ai_analysis.sentiment import SentimentAnalyzer
 
-    analyzer = SentimentAnalyzerV2()
+    analyzer = SentimentAnalyzer()
     result = await analyzer.analyze_sentiment(sample_texts["short"])
 
     print(f"\n分析结果: {result}")
@@ -287,9 +287,9 @@ async def test_sentiment_short_text(sample_texts):
 @pytest.mark.asyncio
 async def test_sentiment_long_text_direct(sample_texts):
     """测试长文本直接分析"""
-    from src.ai_analysis.sentiment_v2 import SentimentAnalyzerV2
+    from src.ai_analysis.sentiment import SentimentAnalyzer
 
-    analyzer = SentimentAnalyzerV2()
+    analyzer = SentimentAnalyzer()
     result = await analyzer.analyze_sentiment(sample_texts["long_text"])
 
     print(f"\n分析结果: {result}")
@@ -306,9 +306,9 @@ async def test_sentiment_long_text_direct(sample_texts):
 @pytest.mark.asyncio
 async def test_sentiment_batch_small(batch_texts):
     """测试小批量分析"""
-    from src.ai_analysis.sentiment_v2 import SentimentAnalyzerV2
+    from src.ai_analysis.sentiment import SentimentAnalyzer
 
-    analyzer = SentimentAnalyzerV2()
+    analyzer = SentimentAnalyzer()
     results = await analyzer.analyze_batch(batch_texts[:3])
 
     print(f"\n分析了 {len(results)} 条文本")
@@ -331,9 +331,9 @@ async def test_sentiment_batch_small(batch_texts):
 @pytest.mark.asyncio
 async def test_sentiment_batch_large(batch_texts):
     """测试大批量分析"""
-    from src.ai_analysis.sentiment_v2 import SentimentAnalyzerV2
+    from src.ai_analysis.sentiment import SentimentAnalyzer
 
-    analyzer = SentimentAnalyzerV2()
+    analyzer = SentimentAnalyzer()
 
     # 创建更多测试数据
     large_batch = batch_texts * 5  # 50 条文本
@@ -363,9 +363,9 @@ async def test_sentiment_batch_large(batch_texts):
 @pytest.mark.asyncio
 async def test_sentiment_with_map_reduce():
     """测试 Map-Reduce 模式"""
-    from src.ai_analysis.sentiment_v2 import SentimentAnalyzerV2
+    from src.ai_analysis.sentiment import SentimentAnalyzer
 
-    analyzer = SentimentAnalyzerV2()
+    analyzer = SentimentAnalyzer()
 
     # 创建超长文本
     long_text = """
@@ -390,9 +390,9 @@ async def test_sentiment_with_map_reduce():
 @pytest.mark.asyncio
 async def test_token_tracking():
     """测试 Token 追踪功能"""
-    from src.ai_analysis.sentiment_v2 import SentimentAnalyzerV2
+    from src.ai_analysis.sentiment import SentimentAnalyzer
 
-    analyzer = SentimentAnalyzerV2()
+    analyzer = SentimentAnalyzer()
 
     # 重置追踪
     analyzer.logger.reset_token_tracking()
@@ -424,9 +424,9 @@ async def test_token_tracking():
 @pytest.mark.asyncio
 async def test_sentiment_consistency():
     """测试分析一致性"""
-    from src.ai_analysis.sentiment_v2 import SentimentAnalyzerV2
+    from src.ai_analysis.sentiment import SentimentAnalyzer
 
-    analyzer = SentimentAnalyzerV2()
+    analyzer = SentimentAnalyzer()
     test_text = "This is a very good product!"
 
     # 分析同一文本多次
@@ -452,9 +452,9 @@ async def test_sentiment_consistency():
 async def test_sentiment_performance():
     """测试分析性能"""
     import time
-    from src.ai_analysis.sentiment_v2 import SentimentAnalyzerV2
+    from src.ai_analysis.sentiment import SentimentAnalyzer
 
-    analyzer = SentimentAnalyzerV2()
+    analyzer = SentimentAnalyzer()
 
     # 测试单条分析性能
     start = time.time()
