@@ -66,3 +66,6 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# chrome
+chrome_profile/

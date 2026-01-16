@@ -41,18 +41,7 @@ class TrendPulseOrchestrator:
             }
         )
 
-        # Twitter is optional (can fail gracefully)
-        if Config.TWITTER_BEARER_TOKEN:
-            try:
-                self.twitter_collector = TwitterCollector(
-                    {
-                        "TWITTER_BEARER_TOKEN": Config.TWITTER_BEARER_TOKEN,
-                    }
-                )
-            except:
-                self.twitter_collector = None
-        else:
-            self.twitter_collector = None
+        self.twitter_collector = TwitterCollector()
 
     async def analyze_keyword(
         self,
@@ -74,10 +63,8 @@ class TrendPulseOrchestrator:
             Dict with analysis results and metadata
         """
         # Default to all platforms
-        if platforms is None:
-            platforms = ["reddit", "youtube"]
-            if self.twitter_collector:
-                platforms.append("twitter")
+        # if platforms is None:
+        platforms = ["reddit", "youtube", "twitter"]
 
         print(f"\n🚀 Starting analysis for keyword: '{keyword}'")
         print(f"📊 Platforms: {', '.join(platforms)}")
@@ -103,19 +90,19 @@ class TrendPulseOrchestrator:
                 print(f"   ✗ Reddit collection failed: {e}")
 
         # YouTube
-        if "youtube" in platforms:
-            print("\n🔵 Collecting from YouTube...")
-            try:
-                youtube_posts = await self.youtube_collector.search(
-                    keyword, language, limit_per_platform
-                )
-                all_posts.extend(youtube_posts)
-                print(f"   ✓ Collected {len(youtube_posts)} posts from YouTube")
-            except Exception as e:
-                print(f"   ✗ YouTube collection failed: {e}")
+        # if "youtube" in platforms:
+        #     print("\n🔵 Collecting from YouTube...")
+        #     try:
+        #         youtube_posts = await self.youtube_collector.search(
+        #             keyword, language, limit_per_platform
+        #         )
+        #         all_posts.extend(youtube_posts)
+        #         print(f"   ✓ Collected {len(youtube_posts)} posts from YouTube")
+        #     except Exception as e:
+        #         print(f"   ✗ YouTube collection failed: {e}")
 
         # Twitter (optional)
-        if "twitter" in platforms and self.twitter_collector:
+        if "twitter" in platforms:
             print("\n⚫ Collecting from Twitter...")
             try:
                 twitter_posts = await self.twitter_collector.search(
