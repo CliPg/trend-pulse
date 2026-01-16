@@ -16,6 +16,7 @@ from youtube_transcript_api._errors import (
     VideoUnavailable,
 )
 from src.collectors.base import BaseCollector, PostData
+from src.utils.logger_config import get_collector_logger
 
 
 class YouTubeCollector(BaseCollector):
@@ -29,6 +30,7 @@ class YouTubeCollector(BaseCollector):
             config: Dictionary containing YouTube API key
         """
         super().__init__(config)
+        self.logger = get_collector_logger("youtube")
         self.api_key = config.get("YOUTUBE_API_KEY")
 
         if not self.api_key:
@@ -65,7 +67,7 @@ class YouTubeCollector(BaseCollector):
         webshare_password = os.getenv("WEBSHARE_PROXY_PASSWORD")
 
         if webshare_username and webshare_password:
-            print("✓ Using Webshare residential proxy")
+            self.logger.info("Using Webshare residential proxy")
             return WebshareProxyConfig(
                 proxy_username=webshare_username,
                 proxy_password=webshare_password,
@@ -74,7 +76,7 @@ class YouTubeCollector(BaseCollector):
         # Priority 2: Check for generic HTTP/HTTPS proxy
         http_proxy = os.getenv("HTTP_PROXY") or os.getenv("HTTPS_PROXY")
         if http_proxy:
-            print(f"✓ Using generic proxy: {http_proxy}")
+            self.logger.info(f"Using generic proxy: {http_proxy}")
             # Use the same proxy for both HTTP and HTTPS
             return GenericProxyConfig(
                 http_url=http_proxy,
@@ -101,40 +103,36 @@ class YouTubeCollector(BaseCollector):
         # Conservative limits to avoid IP blocking
         actual_limit = min(limit, 5)  # Reduced from 10 to 5
 
-        print(f"🔍 Searching for videos with keyword: '{keyword}'")
-        print(f"📊 Limit: {actual_limit} videos (conservative mode to avoid IP blocking)")
-        print()
+        self.logger.info(f"Searching for videos with keyword: '{keyword}'")
+        self.logger.info(f"Limit: {actual_limit} videos (conservative mode to avoid IP blocking)")
 
         # Step 1: Search for videos
         videos = await self._search_videos(keyword, actual_limit)
 
         if not videos:
-            print("⚠️  No videos found")
+            self.logger.warning("No videos found")
             return []
 
-        print(f"📺 Found {len(videos)} videos, fetching transcripts...")
-        print(f"⏱️  Using conservative delays (3-6 seconds between requests) to avoid IP blocking")
-        print()
+        self.logger.info(f"Found {len(videos)} videos, fetching transcripts...")
+        self.logger.info("Using conservative delays (3-6 seconds between requests) to avoid IP blocking")
 
         # Print video URLs for reference
-        print("📋 Video URLs:")
+        self.logger.info("Video URLs:")
         for i, video in enumerate(videos, 1):
             url = f"https://youtube.com/watch?v={video['id']}"
             title = video.get('title', 'Unknown')[:50]
-            print(f"  {i}. {title}...")
-            print(f"     {url}")
-        print()
+            self.logger.info(f"  {i}. {title}... - {url}")
 
         # Add initial random delay before starting
         initial_delay = random.uniform(2, 4)
-        print(f"⏳ Waiting {initial_delay:.1f} seconds before starting...")
+        self.logger.info(f"Waiting {initial_delay:.1f} seconds before starting...")
         await asyncio.sleep(initial_delay)
 
         # Step 2: Fetch transcripts sequentially (to avoid IP blocking)
         posts = []
         for i, video in enumerate(videos, 1):
             url = f"https://youtube.com/watch?v={video['id']}"
-            print(f"  [{i}/{len(videos)}] Fetching transcript for {video['id']}...")
+            self.logger.info(f"[{i}/{len(videos)}] Fetching transcript for {video['id']}...")
 
             try:
                 result = await self._fetch_transcript(video, language)
@@ -151,26 +149,25 @@ class YouTubeCollector(BaseCollector):
                         created_at=video.get("published_at"),
                     )
                     posts.append(post)
-                    print(f"    ✓ Success (transcript length: {len(result)} chars)")
+                    self.logger.info(f"  Success (transcript length: {len(result)} chars)")
                 else:
-                    print(f"    ⚠️  No transcript available")
+                    self.logger.warning(f"  No transcript available for {video['id']}")
 
                 # Add random delay between requests (3-6 seconds) to avoid IP blocking
                 if i < len(videos):
                     delay = random.uniform(3, 6)
-                    print(f"    ⏳ Waiting {delay:.1f} seconds before next request...")
+                    self.logger.info(f"  Waiting {delay:.1f} seconds before next request...")
                     await asyncio.sleep(delay)
 
             except Exception as e:
-                print(f"    ✗ Failed: {str(e)[:100]}")
+                self.logger.error(f"  Failed to fetch transcript: {str(e)[:100]}")
                 # Add extra delay on error
                 error_delay = random.uniform(5, 8)
-                print(f"    ⏳ Waiting {error_delay:.1f} seconds due to error...")
+                self.logger.info(f"  Waiting {error_delay:.1f} seconds due to error...")
                 await asyncio.sleep(error_delay)
                 continue
 
-        print()
-        print(f"✅ Completed! Successfully fetched {len(posts)}/{len(videos)} transcripts")
+        self.logger.info(f"Completed! Successfully fetched {len(posts)}/{len(videos)} transcripts")
         return posts
 
     async def _search_videos(self, keyword: str, limit: int) -> List[dict]:
@@ -214,10 +211,10 @@ class YouTubeCollector(BaseCollector):
             return videos_with_stats
 
         except asyncio.TimeoutError:
-            print("⏱️  YouTube API timeout - check your network connection or proxy")
+            self.logger.error("YouTube API timeout - check your network connection or proxy")
             return []
         except Exception as e:
-            print(f"❌ YouTube API error: {e}")
+            self.logger.error(f"YouTube API error: {e}")
             return []
 
     async def _fetch_video_stats(self, video_ids: List[str]) -> List[dict]:
@@ -266,10 +263,10 @@ class YouTubeCollector(BaseCollector):
             return videos
 
         except asyncio.TimeoutError:
-            print("⏱️  YouTube API timeout while fetching video stats")
+            self.logger.error("YouTube API timeout while fetching video stats")
             return []
         except Exception as e:
-            print(f"❌ Error fetching video stats: {e}")
+            self.logger.error(f"Error fetching video stats: {e}")
             return []
 
     async def _fetch_transcript(self, video: dict, language: str) -> str | None:
@@ -292,7 +289,7 @@ class YouTubeCollector(BaseCollector):
                 # Print proxy info (already printed in __init__, so this is just for debug)
                 api = YouTubeTranscriptApi(proxy_config=self.proxy_config)
             else:
-                print("    ⚠️  No proxy configured - may encounter IP blocking")
+                self.logger.warning("No proxy configured - may encounter IP blocking")
                 api = YouTubeTranscriptApi()
 
             # Use functools.partial to bind the video_id parameter
@@ -321,14 +318,14 @@ class YouTubeCollector(BaseCollector):
             return None
         except Exception as e:
             # Check for IP blocking errors
-            print(f"    ✗ Error fetching transcript: {str(e)}")
             error_str = str(e).lower()
+            self.logger.error(f"Error fetching transcript: {str(e)}")
             if "ip blocked" in error_str or "requestblocked" in error_str or "ipblocked" in error_str:
-                print(f"    ⚠️  YouTube IP blocking detected!")
-                print(f"    💡 Solution: Configure proxy in .env file:")
-                print(f"       # Option 1: Webshare residential proxy (recommended)")
-                print(f"       WEBSHARE_PROXY_USERNAME=your_username")
-                print(f"       WEBSHARE_PROXY_PASSWORD=your_password")
-                print(f"       # Option 2: Generic HTTP proxy")
-                print(f"       HTTP_PROXY=http://127.0.0.1:7890")
+                self.logger.warning("YouTube IP blocking detected!")
+                self.logger.info("Solution: Configure proxy in .env file:")
+                self.logger.info("  # Option 1: Webshare residential proxy (recommended)")
+                self.logger.info("  WEBSHARE_PROXY_USERNAME=your_username")
+                self.logger.info("  WEBSHARE_PROXY_PASSWORD=your_password")
+                self.logger.info("  # Option 2: Generic HTTP proxy")
+                self.logger.info("  HTTP_PROXY=http://127.0.0.1:7890")
             return None

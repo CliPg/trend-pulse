@@ -10,11 +10,13 @@ from typing import List, Optional
 from src.database.operations import DatabaseManager
 from src.orchestrator import TrendPulseOrchestrator
 from src.config import Config
+from src.utils.logger_config import get_api_logger
 
 # Initialize
 app = FastAPI(title="TrendPulse API", version="1.0.0")
 db = DatabaseManager(Config.DATABASE_URL)
 orchestrator = TrendPulseOrchestrator(db)
+logger = get_api_logger()
 
 # CORS middleware for Flutter
 app.add_middleware(
@@ -34,7 +36,7 @@ class AnalysisRequest(BaseModel):
         default=None, description="Platforms to scrape (reddit, youtube, twitter)"
     )
     limit_per_platform: int = Field(
-        default=50, description="Maximum posts per platform"
+        default=20, description="Maximum posts per platform"
     )
 
 
@@ -52,7 +54,9 @@ class AnalysisResponse(BaseModel):
 @app.on_event("startup")
 async def startup():
     """Initialize database on startup."""
+    logger.info("Starting TrendPulse API server...")
     await db.init_db()
+    logger.info("API server started successfully")
 
 
 @app.get("/")
@@ -80,6 +84,9 @@ async def analyze_keyword(request: AnalysisRequest):
     **Note**: This operation can take 30-60 seconds depending on platforms.
     """
     try:
+        logger.info(f"Received analysis request for keyword: '{request.keyword}'")
+        logger.info(f"Platforms: {request.platforms}, Language: {request.language}, Limit: {request.limit_per_platform}")
+
         result = await orchestrator.analyze_keyword(
             keyword=request.keyword,
             language=request.language,
@@ -88,13 +95,17 @@ async def analyze_keyword(request: AnalysisRequest):
         )
 
         if result["status"] == "failed":
+            logger.error(f"Analysis failed for keyword '{request.keyword}': {result['message']}")
             raise HTTPException(status_code=400, detail=result["message"])
 
+        logger.info(f"Analysis completed successfully for keyword '{request.keyword}'")
         return result
 
     except ValueError as e:
+        logger.error(f"Validation error for keyword '{request.keyword}': {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.error(f"Unexpected error analyzing keyword '{request.keyword}': {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -102,6 +113,7 @@ async def analyze_keyword(request: AnalysisRequest):
 async def list_keywords():
     """List all analyzed keywords."""
     keywords = await db.get_all_keywords()
+    logger.info(f"Retrieved {len(keywords)} keywords")
     return {
         "keywords": [
             {
@@ -121,6 +133,7 @@ async def get_keyword_analysis(keyword_id: int):
     """Get detailed analysis for a specific keyword."""
     keyword = await db.get_keyword_by_id(keyword_id)
     if not keyword:
+        logger.warning(f"Keyword {keyword_id} not found")
         raise HTTPException(status_code=404, detail="Keyword not found")
 
     posts = await db.get_posts_by_keyword(keyword_id)

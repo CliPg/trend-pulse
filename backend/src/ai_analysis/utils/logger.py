@@ -1,5 +1,6 @@
 """
 Logging utility for AI analysis with token tracking.
+Uses unified logging configuration from src.utils.logger_config.
 """
 import logging
 import time
@@ -17,18 +18,9 @@ class AnalysisLogger:
         Args:
             name: Logger name
         """
-        self.logger = logging.getLogger(name)
-        self.logger.setLevel(logging.INFO)
-
-        # Console handler
-        if not self.logger.handlers:
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter(
-                "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-                datefmt="%Y-%m-%d %H:%M:%S"
-            )
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
+        # Use unified logging configuration
+        from src.utils.logger_config import get_ai_logger
+        self.logger = get_ai_logger()
 
         # Token tracking
         self.total_input_tokens = 0

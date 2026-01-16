@@ -176,3 +176,7 @@ flutter test
 
 - **Duration**: 5-7 days
 - **Deadline**: January 18, 2026
+
+## Tips
+
+You should activate virtual environment before executing a python command.

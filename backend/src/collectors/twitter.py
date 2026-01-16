@@ -22,6 +22,7 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from webdriver_manager.chrome import ChromeDriverManager
 from urllib.parse import quote
 from src.collectors.base import BaseCollector, PostData
+from src.utils.logger_config import get_collector_logger
 
 
 class TwitterCollector(BaseCollector):
@@ -38,6 +39,7 @@ class TwitterCollector(BaseCollector):
         if config is None:
             config = {}
         super().__init__(config)
+        self.logger = get_collector_logger("twitter")
 
         # Anti-detection settings
         self.user_agent = (
@@ -89,23 +91,23 @@ class TwitterCollector(BaseCollector):
         posts = []
 
         try:
-            print(f"[Twitter] 正在初始化浏览器...")
+            self.logger.info("Initializing browser...")
             driver = self._launch_chrome_browser()
 
-            print(f"[Twitter] 正在搜索关键词: {keyword}")
+            self.logger.info(f"Searching for keyword: {keyword}")
             search_url = f"https://x.com/search?q={quote(keyword)}&src=typed_query&lang={language}"
-            print(f"[Twitter] 搜索 URL: {search_url}")
+            self.logger.debug(f"Search URL: {search_url}")
             driver.get(search_url)
 
             # Wait for page to load
-            print(f"[Twitter] 等待页面加载...")
+            self.logger.info("Waiting for page to load...")
             try:
                 WebDriverWait(driver, 10).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, '[data-testid="tweet"]'))
                 )
-                print(f"[Twitter] 搜索结果已加载")
+                self.logger.info("Search results loaded")
             except TimeoutException:
-                print(f"[Twitter] 等待搜索结果超时，尝试继续...")
+                self.logger.warning("Timeout waiting for search results, trying to continue...")
 
             time.sleep(3)
 
@@ -113,12 +115,12 @@ class TwitterCollector(BaseCollector):
             posts = self._extract_tweets(driver, limit)
 
         except Exception as e:
-            print(f"[Twitter] Error during search: {e}")
+            self.logger.error(f"Error during search: {e}")
             posts = []
 
         finally:
             if driver:
-                print(f"[Twitter] 关闭浏览器...")
+                self.logger.info("Closing browser...")
                 driver.quit()
 
         return posts
@@ -133,7 +135,7 @@ class TwitterCollector(BaseCollector):
         chrome_options = Options()
 
         # User data directory for persisting login state
-        print(f"[Twitter] 使用用户数据目录: {self.user_data_dir}")
+        self.logger.debug(f"Using user data directory: {self.user_data_dir}")
         chrome_options.add_argument(f"--user-data-dir={self.user_data_dir}")
 
         # headless mode
@@ -160,7 +162,7 @@ class TwitterCollector(BaseCollector):
         # if not show_browser:
         #     chrome_options.add_argument("--headless")
 
-        print(f"[Twitter] 正在启动浏览器...")
+        self.logger.info("Launching browser...")
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service, options=chrome_options)
 
@@ -189,7 +191,7 @@ class TwitterCollector(BaseCollector):
         posts = []
         last_height = 0
 
-        print(f"[Twitter] 开始爬取前 {limit} 条推文...")
+        self.logger.info(f"Starting to scrape {limit} tweets...")
 
         while len(posts) < limit:
             # Find all tweet elements
@@ -248,10 +250,10 @@ class TwitterCollector(BaseCollector):
                     )
                     posts.append(post)
 
-                    print(f"[Twitter] 已爬取 {len(posts)}/{limit} 条推文")
+                    self.logger.info(f"Scraped {len(posts)}/{limit} tweets")
 
                 except Exception as e:
-                    print(f"[Twitter] 提取推文时出错: {e}")
+                    self.logger.error(f"Error extracting tweet: {e}")
                     continue
 
             if len(posts) >= limit:
@@ -264,11 +266,11 @@ class TwitterCollector(BaseCollector):
             # Check if reached bottom
             new_height = driver.execute_script("return document.body.scrollHeight")
             if new_height == last_height:
-                print(f"[Twitter] 已到达页面底部")
+                self.logger.info("Reached page bottom")
                 break
             last_height = new_height
 
-        print(f"[Twitter] 爬取完成！共获取 {len(posts)} 条推文")
+        self.logger.info(f"Scraping completed! Collected {len(posts)} tweets")
         return posts
 
     def _extract_metrics(self, tweet) -> dict:
@@ -309,7 +311,7 @@ class TwitterCollector(BaseCollector):
                 metrics["replies"] = 0
 
         except Exception as e:
-            print(f"[Twitter] 提取指标时出错: {e}")
+            self.logger.error(f"Error extracting metrics: {e}")
 
         return metrics
 

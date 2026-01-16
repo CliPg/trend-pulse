@@ -8,6 +8,7 @@ from datetime import datetime
 import praw
 from prawcore.exceptions import ResponseException
 from src.collectors.base import BaseCollector, PostData
+from src.utils.logger_config import get_collector_logger
 
 
 class RedditCollector(BaseCollector):
@@ -21,6 +22,7 @@ class RedditCollector(BaseCollector):
             config: Dictionary containing Reddit credentials (client_id, client_secret, user_agent)
         """
         super().__init__(config)
+        self.logger = get_collector_logger("reddit")
         self.client_id = config.get("REDDIT_CLIENT_ID")
         self.client_secret = config.get("REDDIT_CLIENT_SECRET")
         self.user_agent = config.get("REDDIT_USER_AGENT", "trendpulse/1.0")
@@ -97,9 +99,9 @@ class RedditCollector(BaseCollector):
                 posts.append(post)
 
         except ResponseException as e:
-            print(f"Reddit API error: {e}")
+            self.logger.error(f"Reddit API error: {e}")
         except Exception as e:
-            print(f"Error searching Reddit: {e}")
+            self.logger.error(f"Error searching Reddit: {e}")
 
         return posts
 
@@ -163,6 +165,6 @@ class RedditCollector(BaseCollector):
                 posts.append(post)
 
         except Exception as e:
-            print(f"Error searching subreddit {subreddit}: {e}")
+            self.logger.error(f"Error searching subreddit {subreddit}: {e}")
 
         return posts

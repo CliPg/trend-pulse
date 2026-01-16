@@ -11,6 +11,7 @@ from src.collectors.twitter import TwitterCollector
 from src.ai_analysis.pipeline import AnalysisPipeline
 from src.database.operations import DatabaseManager
 from src.config import Config
+from src.utils.logger_config import get_orchestrator_logger
 
 
 class TrendPulseOrchestrator:
@@ -25,6 +26,7 @@ class TrendPulseOrchestrator:
         """
         self.db = db_manager
         self.pipeline = AnalysisPipeline()
+        self.logger = get_orchestrator_logger()
 
         # Initialize collectors
         self.reddit_collector = RedditCollector(
@@ -66,10 +68,10 @@ class TrendPulseOrchestrator:
         # if platforms is None:
         platforms = ["reddit", "youtube", "twitter"]
 
-        print(f"\n🚀 Starting analysis for keyword: '{keyword}'")
-        print(f"📊 Platforms: {', '.join(platforms)}")
-        print(f"📝 Language: {language}")
-        print(f"🔢 Limit: {limit_per_platform} per platform")
+        self.logger.info(f"Starting analysis for keyword: '{keyword}'")
+        self.logger.info(f"Platforms: {', '.join(platforms)}")
+        self.logger.info(f"Language: {language}")
+        self.logger.info(f"Limit: {limit_per_platform} per platform")
 
         # Create or get keyword entry
         db_keyword = await self.db.get_or_create_keyword(keyword, language)
@@ -79,42 +81,42 @@ class TrendPulseOrchestrator:
 
         # Reddit
         if "reddit" in platforms:
-            print("\n🔴 Collecting from Reddit...")
+            self.logger.info("Collecting from Reddit...")
             try:
                 reddit_posts = await self.reddit_collector.search(
                     keyword, language, limit_per_platform
                 )
                 all_posts.extend(reddit_posts)
-                print(f"   ✓ Collected {len(reddit_posts)} posts from Reddit")
+                self.logger.info(f"Collected {len(reddit_posts)} posts from Reddit")
             except Exception as e:
-                print(f"   ✗ Reddit collection failed: {e}")
+                self.logger.error(f"Reddit collection failed: {e}")
 
         # YouTube
         # if "youtube" in platforms:
-        #     print("\n🔵 Collecting from YouTube...")
+        #     self.logger.info("Collecting from YouTube...")
         #     try:
         #         youtube_posts = await self.youtube_collector.search(
         #             keyword, language, limit_per_platform
         #         )
         #         all_posts.extend(youtube_posts)
-        #         print(f"   ✓ Collected {len(youtube_posts)} posts from YouTube")
+        #         self.logger.info(f"Collected {len(youtube_posts)} posts from YouTube")
         #     except Exception as e:
-        #         print(f"   ✗ YouTube collection failed: {e}")
+        #         self.logger.error(f"YouTube collection failed: {e}")
 
         # Twitter (optional)
         if "twitter" in platforms:
-            print("\n⚫ Collecting from Twitter...")
+            self.logger.info("Collecting from Twitter...")
             try:
                 twitter_posts = await self.twitter_collector.search(
                     keyword, language, limit_per_platform
                 )
                 all_posts.extend(twitter_posts)
-                print(f"   ✓ Collected {len(twitter_posts)} posts from Twitter")
+                self.logger.info(f"Collected {len(twitter_posts)} posts from Twitter")
             except Exception as e:
-                print(f"   ✗ Twitter collection failed: {e}")
+                self.logger.error(f"Twitter collection failed: {e}")
 
         if not all_posts:
-            print("\n❌ No posts collected from any platform")
+            self.logger.error("No posts collected from any platform")
             return {
                 "keyword": keyword,
                 "status": "failed",
@@ -122,10 +124,10 @@ class TrendPulseOrchestrator:
                 "posts_count": 0,
             }
 
-        print(f"\n✓ Total posts collected: {len(all_posts)}")
+        self.logger.info(f"Total posts collected: {len(all_posts)}")
 
         # Save posts to database
-        print("\n💾 Saving to database...")
+        self.logger.info("Saving to database...")
         posts_data = [
             {
                 "platform": post.platform,
@@ -142,10 +144,10 @@ class TrendPulseOrchestrator:
         ]
 
         saved_posts = await self.db.save_posts(posts_data, db_keyword.id)
-        print(f"   ✓ Saved {len(saved_posts)} posts")
+        self.logger.info(f"Saved {len(saved_posts)} posts to database")
 
         # Run AI analysis
-        print("\n🤖 Running AI analysis...")
+        self.logger.info("Running AI analysis...")
         posts_for_analysis = [
             {"content": post.content, "author": post.author} for post in saved_posts
         ]
@@ -153,7 +155,7 @@ class TrendPulseOrchestrator:
         analysis_results = await self.pipeline.analyze_posts(posts_for_analysis)
 
         # Update sentiment scores in database
-        print("\n💾 Saving analysis results...")
+        self.logger.info("Saving analysis results...")
         for post, sentiment_result in zip(saved_posts, analysis_results["sentiment_results"]):
             await self.db.update_sentiment(
                 post.id,
@@ -180,7 +182,7 @@ class TrendPulseOrchestrator:
             analysis_results["summary"],
         )
 
-        print("\n✅ Analysis complete!")
+        self.logger.info("Analysis complete!")
 
         return {
             "keyword": keyword,
