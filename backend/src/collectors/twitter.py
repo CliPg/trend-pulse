@@ -1,15 +1,23 @@
 """
-X/Twitter data collector using Playwright headless browser.
+X/Twitter data collector using Selenium headless browser.
 This method doesn't require API access but is more fragile than official API.
 """
 import asyncio
+import time
+import os
 from typing import List
-from playwright.async_api import async_playwright, Page
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from src.collectors.base import BaseCollector, PostData
 
 
 class TwitterCollector(BaseCollector):
-    """Collects tweets using Playwright (no API required)."""
+    """Collects tweets using Selenium (no API required)."""
 
     def __init__(self, config: dict):
         """
@@ -32,7 +40,7 @@ class TwitterCollector(BaseCollector):
         self, keyword: str, language: str = "en", limit: int = 50
     ) -> List[PostData]:
         """
-        Search X/Twitter using Playwright.
+        Search X/Twitter using Selenium.
 
         Warning: This method is fragile and may break due to Twitter's
         anti-bot measures. Consider using official API if available.
@@ -45,50 +53,88 @@ class TwitterCollector(BaseCollector):
         Returns:
             List of PostData objects
         """
-        async with async_playwright() as p:
-            # Launch browser with anti-detection settings
-            browser = await p.chromium.launch(
-                headless=True,
-                args=[
-                    "--disable-blink-features=AutomationControlled",
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                ],
-            )
+        # Run synchronous Selenium code in executor
+        loop = asyncio.get_event_loop()
+        posts = await loop.run_in_executor(None, self._search_sync, keyword, language, limit)
+        return posts
 
-            context = await browser.new_context(
-                user_agent=self.user_agent,
-                viewport={"width": 1920, "height": 1080},
-            )
+    def _search_sync(
+        self, keyword: str, language: str, limit: int
+    ) -> List[PostData]:
+        """
+        Synchronous search implementation using Selenium.
 
-            page = await context.new_page()
+        Args:
+            keyword: Search query
+            language: Language code
+            limit: Maximum number of tweets
+
+        Returns:
+            List of PostData objects
+        """
+        driver = None
+        posts = []
+
+        try:
+            # Configure Chrome options
+            chrome_options = Options()
+            chrome_options.add_argument(f"user-agent={self.user_agent}")
+            chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+            chrome_options.add_argument("--no-sandbox")
+            chrome_options.add_argument("--disable-setuid-sandbox")
+            chrome_options.add_argument("--disable-dev-shm-usage")
+            chrome_options.add_argument("--disable-gpu")
+            chrome_options.add_argument("--window-size=1920,1080")
+
+            # Run in headless mode (unless SHOW_BROWSER env var is set for debugging)
+            # show_browser = os.getenv("SHOW_BROWSER", "false").lower() == "true"
+            show_browser = True
+            if not show_browser:
+                chrome_options.add_argument("--headless")
+                chrome_options.add_argument("--disable-extensions")
+
+            # Exclude automation flags
+            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            chrome_options.add_experimental_option("useAutomationExtension", False)
+
+            # Initialize driver
+            driver = webdriver.Chrome(options=chrome_options)
+
+            # Execute CDP commands to hide webdriver property
+            driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+                "source": """
+                    Object.defineProperty(navigator, 'webdriver', {
+                        get: () => undefined
+                    })
+                """
+            })
 
             # Navigate to Twitter search
-            search_url = f"https://twitter.com/search?q={keyword}&src=typed_query"
-            try:
-                await page.goto(search_url, wait_until="networkidle", timeout=15000)
+            search_url = f"https://x.com/search?q={keyword}&src=typed_query"
+            driver.get(search_url)
 
-                # Wait for content to load
-                await asyncio.sleep(3)
+            # Wait for page to load
+            time.sleep(5)
 
-                # Extract tweets
-                posts = await self._extract_tweets(page, limit)
+            # Extract tweets
+            posts = self._extract_tweets(driver, limit)
 
-            except Exception as e:
-                print(f"Error navigating to Twitter: {e}")
-                posts = []
+        except Exception as e:
+            print(f"Error navigating to Twitter: {e}")
+            posts = []
 
-            finally:
-                await browser.close()
+        finally:
+            if driver:
+                driver.quit()
 
-            return posts
+        return posts
 
-    async def _extract_tweets(self, page: Page, limit: int) -> List[PostData]:
+    def _extract_tweets(self, driver, limit: int) -> List[PostData]:
         """
         Extract tweet data from page.
 
         Args:
-            page: Playwright page object
+            driver: Selenium WebDriver instance
             limit: Maximum number of tweets
 
         Returns:
@@ -99,34 +145,38 @@ class TwitterCollector(BaseCollector):
         try:
             # Scroll to load more tweets
             for _ in range(3):  # Scroll 3 times
-                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-                await asyncio.sleep(2)
+                driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(2)
 
             # Extract tweet elements
-            tweets = await page.query_selector_all('[data-testid="tweet"]')
+            tweets = driver.find_elements(By.CSS_SELECTOR, '[data-testid="tweet"]')
 
             for tweet in tweets[:limit]:
                 try:
                     # Extract tweet text
-                    text_element = await tweet.query_selector('[data-testid="tweetText"]')
-                    if not text_element:
+                    try:
+                        text_element = tweet.find_element(By.CSS_SELECTOR, '[data-testid="tweetText"]')
+                        text = text_element.text
+                    except NoSuchElementException:
                         continue
 
-                    text = await text_element.inner_text()
-
                     # Extract author
-                    author_element = await tweet.query_selector('[data-testid="User-Name"]')
-                    author = await author_element.inner_text() if author_element else "Unknown"
+                    try:
+                        author_element = tweet.find_element(By.CSS_SELECTOR, '[data-testid="User-Name"]')
+                        author = author_element.text
+                    except NoSuchElementException:
+                        author = "Unknown"
 
                     # Extract tweet URL
                     tweet_url = ""
-                    link_element = await tweet.query_selector('time')
-                    if link_element:
-                        parent = await link_element.evaluate("el => el.closest('a').href")
-                        tweet_url = parent
+                    try:
+                        link_element = tweet.find_element(By.TAG_NAME, 'time')
+                        tweet_url = link_element.find_element(By.XPATH, "..").get_attribute('href')
+                    except NoSuchElementException:
+                        pass
 
                     # Extract engagement metrics
-                    metrics = await self._extract_metrics(tweet)
+                    metrics = self._extract_metrics(tweet)
 
                     # Filter spam
                     if self.is_spam(text):
@@ -153,12 +203,12 @@ class TwitterCollector(BaseCollector):
 
         return posts
 
-    async def _extract_metrics(self, tweet) -> dict:
+    def _extract_metrics(self, tweet) -> dict:
         """
         Extract engagement metrics from tweet.
 
         Args:
-            tweet: Tweet element
+            tweet: Tweet WebElement
 
         Returns:
             Dictionary with metrics
@@ -167,20 +217,26 @@ class TwitterCollector(BaseCollector):
 
         try:
             # This is fragile and may break - selectors change frequently
-            like_element = await tweet.query_selector('[data-testid="like"]')
-            if like_element:
-                like_text = await like_element.inner_text()
+            try:
+                like_element = tweet.find_element(By.CSS_SELECTOR, '[data-testid="like"]')
+                like_text = like_element.text
                 metrics["likes"] = self._parse_metric(like_text)
+            except NoSuchElementException:
+                pass
 
-            retweet_element = await tweet.query_selector('[data-testid="retweet"]')
-            if retweet_element:
-                retweet_text = await retweet_element.inner_text()
+            try:
+                retweet_element = tweet.find_element(By.CSS_SELECTOR, '[data-testid="retweet"]')
+                retweet_text = retweet_element.text
                 metrics["retweets"] = self._parse_metric(retweet_text)
+            except NoSuchElementException:
+                pass
 
-            reply_element = await tweet.query_selector('[data-testid="reply"]')
-            if reply_element:
-                reply_text = await reply_element.inner_text()
+            try:
+                reply_element = tweet.find_element(By.CSS_SELECTOR, '[data-testid="reply"]')
+                reply_text = reply_element.text
                 metrics["replies"] = self._parse_metric(reply_text)
+            except NoSuchElementException:
+                pass
 
         except Exception as e:
             print(f"Error extracting metrics: {e}")
