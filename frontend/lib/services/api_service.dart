@@ -13,6 +13,7 @@ class AnalysisResult {
   final String summary;
   final List<OpinionCluster> opinionClusters;
   final List<Post> posts;
+  final MermaidCharts? mermaid;
 
   AnalysisResult({
     required this.keyword,
@@ -22,6 +23,7 @@ class AnalysisResult {
     required this.summary,
     required this.opinionClusters,
     required this.posts,
+    this.mermaid,
   });
 
   factory AnalysisResult.fromJson(Map<String, dynamic> json) {
@@ -35,6 +37,27 @@ class AnalysisResult {
           .map((e) => OpinionCluster.fromJson(e))
           .toList(),
       posts: (json["posts"] as List).map((e) => Post.fromJson(e)).toList(),
+      mermaid: json["mermaid"] != null ? MermaidCharts.fromJson(json["mermaid"]) : null,
+    );
+  }
+}
+
+class MermaidCharts {
+  final String mindmap;
+  final String pieChart;
+  final String flowchart;
+
+  MermaidCharts({
+    required this.mindmap,
+    required this.pieChart,
+    required this.flowchart,
+  });
+
+  factory MermaidCharts.fromJson(Map<String, dynamic> json) {
+    return MermaidCharts(
+      mindmap: json["mindmap"] ?? "",
+      pieChart: json["pie_chart"] ?? "",
+      flowchart: json["flowchart"] ?? "",
     );
   }
 }

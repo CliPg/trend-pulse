@@ -24,6 +24,10 @@ dependencies:
   # URL launcher
   url_launcher: ^6.2.0
 
+  # WebView for Mermaid rendering
+  webview_flutter: ^4.4.2
+  webview_flutter_web: ^0.2.2+4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

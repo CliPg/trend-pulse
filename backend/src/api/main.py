@@ -40,6 +40,13 @@ class AnalysisRequest(BaseModel):
     )
 
 
+class MermaidCharts(BaseModel):
+    """Mermaid diagram code for visualizations."""
+    mindmap: str = Field(..., description="Mermaid mindmap code")
+    pie_chart: str = Field(..., description="Mermaid pie chart code")
+    flowchart: str = Field(..., description="Mermaid flowchart code")
+
+
 class AnalysisResponse(BaseModel):
     keyword: str
     status: str
@@ -49,6 +56,7 @@ class AnalysisResponse(BaseModel):
     summary: str
     opinion_clusters: List[dict]
     posts: List[dict]
+    mermaid: Optional[MermaidCharts] = Field(default=None, description="Mermaid visualization charts")
 
 
 @app.on_event("startup")

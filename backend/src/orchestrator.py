@@ -12,6 +12,11 @@ from src.ai_analysis.pipeline import AnalysisPipeline
 from src.database.operations import DatabaseManager
 from src.config import Config
 from src.utils.logger_config import get_orchestrator_logger
+from src.utils.mermaid_generator import (
+    generate_mermaid_mindmap,
+    generate_mermaid_pie_chart,
+    generate_mermaid_flowchart
+)
 
 
 class TrendPulseOrchestrator:
@@ -184,6 +189,39 @@ class TrendPulseOrchestrator:
 
         self.logger.info("Analysis complete!")
 
+        # Generate Mermaid visualizations
+        sentiment_label = self._get_sentiment_label(analysis_results["overall_sentiment"])
+
+        mermaid_mindmap = generate_mermaid_mindmap(
+            keyword=keyword,
+            clusters=analysis_results["clusters"][:3],
+            sentiment_score=analysis_results["overall_sentiment"],
+            sentiment_label=sentiment_label
+        )
+
+        mermaid_pie_chart = generate_mermaid_pie_chart(
+            keyword=keyword,
+            clusters=analysis_results["clusters"][:3]
+        )
+
+        # Prepare posts data for flowchart (only include posts with valid sentiment scores)
+        posts_data = [
+            {
+                "platform": post.platform,
+                "author": post.author,
+                "content": post.content,
+                "sentiment_score": post.sentiment_score,
+            }
+            for post in saved_posts[:10]
+            if post.sentiment_score is not None  # Filter out None values
+        ]
+
+        mermaid_flowchart = generate_mermaid_flowchart(
+            keyword=keyword,
+            posts=posts_data,
+            top_n=10
+        )
+
         return {
             "keyword": keyword,
             "keyword_id": db_keyword.id,
@@ -191,11 +229,14 @@ class TrendPulseOrchestrator:
             "posts_count": len(saved_posts),
             "platforms": platforms,
             "overall_sentiment": analysis_results["overall_sentiment"],
-            "sentiment_label": self._get_sentiment_label(
-                analysis_results["overall_sentiment"]
-            ),
+            "sentiment_label": sentiment_label,
             "summary": analysis_results["summary"],
             "opinion_clusters": analysis_results["clusters"][:3],
+            "mermaid": {
+                "mindmap": mermaid_mindmap,
+                "pie_chart": mermaid_pie_chart,
+                "flowchart": mermaid_flowchart,
+            },
             "posts": [
                 {
                     "platform": post.platform,

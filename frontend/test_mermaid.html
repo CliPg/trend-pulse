@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mermaid Test Page - TrendPulse</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 14px;
+            margin: 10px 0;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .preview {
+            min-height: 300px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 20px;
+            background: white;
+            margin-top: 20px;
+        }
+        .error {
+            color: #721c24;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #155724;
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Mermaid 测试工具</h1>
+        <p>这个工具用于测试后端生成的 Mermaid 代码是否能正确渲染。</p>
+
+        <h2>测试用例</h2>
+        <button onclick="loadMindmapTest()">加载思维导图示例</button>
+        <button onclick="loadFlowchartTest()">加载流程图示例</button>
+        <button onclick="loadPieChartTest()">加载饼图示例</button>
+        <button onclick="clearAll()">清空</button>
+
+        <h2>Mermaid 代码编辑器</h2>
+        <textarea id="mermaidInput" placeholder="在此粘贴从后端获取的 Mermaid 代码..."></textarea>
+
+        <button onclick="renderMermaid()">🎨 渲染图表</button>
+
+        <div id="status"></div>
+
+        <h2>预览</h2>
+        <div class="preview" id="preview">
+            <div style="text-align: center; color: #999; padding: 50px;">
+                等待渲染...
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+            logLevel: 'debug',
+            mindmap: {
+                padding: 10,
+                useMaxWidth: true,
+            }
+        });
+
+        const mindmapExample = `mindmap
+  root((iPhone))
+    Sentiment
+      Score: 65.0/100
+      Label: Neutral
+    Opinion_1[Product Quality]
+      Mentions: 15
+      Point_[Great camera quality]
+      Point_[Love the design]
+    Opinion_2[Battery Life]
+      Mentions: 12
+      Point_[Needs improvement]
+      Point_[Drains too fast]
+    Opinion_3[Price]
+      Mentions: 8
+      Point_[Too expensive]
+      Point_[Worth the price]`;
+
+        const flowchartExample = `graph TD
+    KeyNode[iPhone]
+    Positive[😊 Positive]
+    Neutral[😐 Neutral]
+    Negative[😟 Negative]
+    Pos1[Amazing camera and features]
+    Pos2[Best phone ever]
+    Pos3[Love the ecosystem]
+    Neu1[It is okay for daily use]
+    Neu2[Nothing special]
+    Neg1[Battery life is terrible]
+    Neg2[Too expensive for what you get]
+    Neg3[Disappointed with quality]
+    KeyNode --> Positive
+    KeyNode --> Neutral
+    KeyNode --> Negative
+    Positive --> Pos1
+    Positive --> Pos2
+    Positive --> Pos3
+    Neutral --> Neu1
+    Neutral --> Neu2
+    Negative --> Neg1
+    Negative --> Neg2
+    Negative --> Neg3
+    classDef positive fill:#90EE90
+    classDef neutral fill:#FFD700
+    classDef negative fill:#FFB6C1`;
+
+        const pieChartExample = `pie title iPhone - Opinion Distribution
+  "Product Quality" : 45.5
+  "Battery Life" : 32.1
+  "Price" : 22.4`;
+
+        function loadMindmapTest() {
+            document.getElementById('mermaidInput').value = mindmapExample;
+            showStatus('思维导图示例已加载', 'success');
+        }
+
+        function loadFlowchartTest() {
+            document.getElementById('mermaidInput').value = flowchartExample;
+            showStatus('流程图示例已加载', 'success');
+        }
+
+        function loadPieChartTest() {
+            document.getElementById('mermaidInput').value = pieChartExample;
+            showStatus('饼图示例已加载', 'success');
+        }
+
+        function clearAll() {
+            document.getElementById('mermaidInput').value = '';
+            document.getElementById('preview').innerHTML = '<div style="text-align: center; color: #999; padding: 50px;">等待渲染...</div>';
+            document.getElementById('status').innerHTML = '';
+        }
+
+        async function renderMermaid() {
+            const code = document.getElementById('mermaidInput').value.trim();
+            const preview = document.getElementById('preview');
+
+            if (!code) {
+                showStatus('请输入 Mermaid 代码', 'error');
+                return;
+            }
+
+            try {
+                preview.innerHTML = '<div style="text-align: center; padding: 50px;"><div style="display: inline-block; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; animation: spin 1s linear infinite;"></div><p>正在渲染...</p></div>';
+
+                // Create a unique ID for this render
+                const id = 'mermaid-' + Date.now();
+
+                // Check if the code is valid
+                const result = await mermaid.render(id, code);
+
+                preview.innerHTML = result.svg;
+                showStatus('✅ 渲染成功！', 'success');
+
+            } catch (error) {
+                console.error('Mermaid rendering error:', error);
+                preview.innerHTML = `<div class="error">❌ 渲染失败<br><br><strong>错误信息:</strong><br>${error.message || error}<br><br><strong>建议:</strong><br>1. 检查 Mermaid 语法<br>2. 查看浏览器控制台获取详细信息<br>3. 访问 https://mermaid.live/ 验证语法</div>`;
+                showStatus('❌ 渲染失败', 'error');
+            }
+        }
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.innerHTML = `<div class="${type}">${message}</div>`;
+            setTimeout(() => {
+                status.innerHTML = '';
+            }, 5000);
+        }
+
+        // Add spin animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>

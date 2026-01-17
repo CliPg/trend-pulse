@@ -4,11 +4,16 @@ Modern UI with gradient backgrounds, cards, and smooth animations.
 */
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
+import "package:flutter/foundation.dart" show kIsWeb;
 import "../services/api_service.dart";
 import "../services/mock_data.dart";
 import "../widgets/half_gauge.dart";
 import "../widgets/opinion_card.dart";
 import "../widgets/post_list.dart";
+import "../widgets/mermaid_viewer.dart";
+
+// Conditional import for web platform - default to stub, use web viewer only when dart:html is available
+import "../widgets/mermaid_stub.dart" if (dart.library.html) "../widgets/mermaid_web_viewer.dart";
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -827,6 +832,28 @@ class _DashboardScreenState extends State<DashboardScreen>
           _buildSummaryCard(colorScheme),
           const SizedBox(height: 24),
 
+          // Mermaid Mind Map (if available)
+          if (_result?.mermaid != null) ...[
+            _buildSectionHeader("Mind Map", Icons.account_tree),
+            const SizedBox(height: 12),
+            _buildMermaidViewer(
+              _result!.mermaid!.mindmap,
+              "${_result!.keyword} - Opinion Mind Map",
+              450,
+            ),
+            const SizedBox(height: 24),
+
+            // Mermaid Flow Chart
+            _buildSectionHeader("Sentiment Flow", Icons.timeline),
+            const SizedBox(height: 12),
+            _buildMermaidViewer(
+              _result!.mermaid!.flowchart,
+              "Posts by Sentiment",
+              400,
+            ),
+            const SizedBox(height: 24),
+          ],
+
           // Opinion Clusters
           _buildSectionHeader("Key Opinions", Icons.lightbulb),
           const SizedBox(height: 12),
@@ -1016,6 +1043,25 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
       ],
     );
+  }
+
+  Widget _buildMermaidViewer(String mermaidCode, String title, double height) {
+    // Use different viewers based on platform
+    if (kIsWeb) {
+      // For Web (Chrome), use iframe-based viewer
+      return MermaidWebViewer(
+        mermaidCode: mermaidCode,
+        title: title,
+        height: height,
+      );
+    } else {
+      // For mobile (iOS/Android), use WebView-based viewer
+      return MermaidViewer(
+        mermaidCode: mermaidCode,
+        title: title,
+        height: height,
+      );
+    }
   }
 
   Color _getSentimentColor(double score) {
