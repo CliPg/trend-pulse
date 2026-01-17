@@ -142,7 +142,7 @@ class RedditCollector(BaseCollector):
         chrome_options.add_argument(f"--user-data-dir={self.user_data_dir}")
 
         # Headless mode
-        # chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--headless")
 
         # Anti-detection configuration
         chrome_options.add_argument("--disable-blink-features=AutomationControlled")

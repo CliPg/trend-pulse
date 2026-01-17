@@ -64,9 +64,9 @@ class TrendPulseOrchestrator:
         Returns:
             Dict with analysis results and metadata
         """
-        # Default to all platforms
-        # if platforms is None:
-        platforms = ["reddit", "youtube", "twitter"]
+        # Default to all platforms if none specified
+        if platforms is None:
+            platforms = ["reddit", "youtube", "twitter"]
 
         self.logger.info(f"Starting analysis for keyword: '{keyword}'")
         self.logger.info(f"Platforms: {', '.join(platforms)}")
@@ -92,16 +92,16 @@ class TrendPulseOrchestrator:
                 self.logger.error(f"Reddit collection failed: {e}")
 
         # YouTube
-        # if "youtube" in platforms:
-        #     self.logger.info("Collecting from YouTube...")
-        #     try:
-        #         youtube_posts = await self.youtube_collector.search(
-        #             keyword, language, limit_per_platform
-        #         )
-        #         all_posts.extend(youtube_posts)
-        #         self.logger.info(f"Collected {len(youtube_posts)} posts from YouTube")
-        #     except Exception as e:
-        #         self.logger.error(f"YouTube collection failed: {e}")
+        if "youtube" in platforms:
+            self.logger.info("Collecting from YouTube...")
+            try:
+                youtube_posts = await self.youtube_collector.search(
+                    keyword, language, limit_per_platform
+                )
+                all_posts.extend(youtube_posts)
+                self.logger.info(f"Collected {len(youtube_posts)} posts from YouTube")
+            except Exception as e:
+                self.logger.error(f"YouTube collection failed: {e}")
 
         # Twitter (optional)
         if "twitter" in platforms:

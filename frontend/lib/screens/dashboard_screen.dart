@@ -26,6 +26,14 @@ class _DashboardScreenState extends State<DashboardScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
+  // Platform selection
+  final List<String> _availablePlatforms = ["reddit", "youtube", "twitter"];
+  final Set<String> _selectedPlatforms = {"reddit", "youtube"};
+
+  // Language and limit settings
+  String _selectedLanguage = "en";
+  final TextEditingController _limitController = TextEditingController(text: "50");
+
   @override
   void initState() {
     super.initState();
@@ -42,12 +50,40 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   void dispose() {
     _keywordController.dispose();
+    _limitController.dispose();
     _animationController.dispose();
     super.dispose();
   }
 
   Future<void> _analyzeKeyword() async {
     if (_keywordController.text.isEmpty) return;
+
+    if (_selectedPlatforms.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text("Please select at least one platform"),
+          backgroundColor: Colors.orange.shade600,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+
+    // Validate limit input
+    final limitText = _limitController.text;
+    final limit = int.tryParse(limitText);
+    if (limit == null || limit <= 0 || limit > 200) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text("Please enter a valid limit (1-200)"),
+          backgroundColor: Colors.orange.shade600,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -58,9 +94,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     try {
       final result = await ApiService().analyzeKeyword(
         keyword: _keywordController.text,
-        language: "en",
-        platforms: ["reddit", "youtube"],
-        limitPerPlatform: 50,
+        language: _selectedLanguage,
+        platforms: _selectedPlatforms.toList(),
+        limitPerPlatform: limit,
       );
 
       setState(() {
@@ -357,8 +393,284 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
               onSubmitted: (_) => _analyzeKeyword(),
             ),
+            const SizedBox(height: 20),
+
+            // Platform Selection
+            _buildPlatformSelector(colorScheme),
+
+            const SizedBox(height: 20),
+
+            // Language and Limit Settings
+            _buildSettingsRow(colorScheme),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPlatformSelector(ColorScheme colorScheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.dashboard,
+              size: 20,
+              color: Colors.grey[700],
+            ),
+            const SizedBox(width: 8),
+            Text(
+              "Select Platforms",
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[800],
+              ),
+            ),
+            const Spacer(),
+            Text(
+              "${_selectedPlatforms.length} selected",
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: _availablePlatforms.map((platform) {
+            final isSelected = _selectedPlatforms.contains(platform);
+            final platformInfo = _getPlatformInfo(platform);
+
+            return FilterChip(
+              selected: isSelected,
+              label: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    platformInfo["icon"] as IconData,
+                    size: 18,
+                    color: isSelected ? Colors.white : platformInfo["color"] as Color,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    platformInfo["label"] as String,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.grey[700],
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              onSelected: (selected) {
+                setState(() {
+                  if (selected) {
+                    _selectedPlatforms.add(platform);
+                  } else {
+                    _selectedPlatforms.remove(platform);
+                  }
+                });
+              },
+              selectedColor: platformInfo["color"] as Color,
+              backgroundColor: Colors.grey[100],
+              checkmarkColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(
+                  color: isSelected
+                      ? (platformInfo["color"] as Color)
+                      : Colors.grey[300]!,
+                  width: isSelected ? 1.5 : 1,
+                ),
+              ),
+              elevation: isSelected ? 2 : 0,
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Map<String, dynamic> _getPlatformInfo(String platform) {
+    switch (platform) {
+      case "reddit":
+        return {
+          "label": "Reddit",
+          "icon": Icons.reddit,
+          "color": const Color(0xFFFF4500),
+        };
+      case "youtube":
+        return {
+          "label": "YouTube",
+          "icon": Icons.play_circle_filled,
+          "color": const Color(0xFFFF0000),
+        };
+      case "twitter":
+        return {
+          "label": "X (Twitter)",
+          "icon": Icons.alternate_email,
+          "color": const Color(0xFF000000),
+        };
+      default:
+        return {
+          "label": platform,
+          "icon": Icons.public,
+          "color": Colors.grey,
+        };
+    }
+  }
+
+  Widget _buildSettingsRow(ColorScheme colorScheme) {
+    return Row(
+      children: [
+        // Language Selector
+        Expanded(
+          child: _buildLanguageSelector(colorScheme),
+        ),
+        const SizedBox(width: 16),
+        // Limit Input
+        Expanded(
+          child: _buildLimitInput(colorScheme),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLanguageSelector(ColorScheme colorScheme) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.language,
+                  size: 16,
+                  color: Colors.grey[700],
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  "Language",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(
+                  value: "en",
+                  label: Text("EN", style: TextStyle(fontWeight: FontWeight.w600)),
+                  icon: Icon(Icons.abc, size: 18),
+                ),
+                ButtonSegment(
+                  value: "zh",
+                  label: Text("中", style: TextStyle(fontWeight: FontWeight.w600)),
+                  icon: Icon(Icons.translate, size: 18),
+                ),
+              ],
+              selected: {_selectedLanguage},
+              onSelectionChanged: (Set<String> newSelection) {
+                setState(() {
+                  _selectedLanguage = newSelection.first;
+                });
+              },
+              style: ButtonStyle(
+                backgroundColor: MaterialStateProperty.resolveWith((states) {
+                  if (states.contains(MaterialState.selected)) {
+                    return colorScheme.primary;
+                  }
+                  return Colors.transparent;
+                }),
+                foregroundColor: MaterialStateProperty.resolveWith((states) {
+                  if (states.contains(MaterialState.selected)) {
+                    return Colors.white;
+                  }
+                  return Colors.grey[700];
+                }),
+                padding: MaterialStateProperty.all(
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLimitInput(ColorScheme colorScheme) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.grey[300]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.format_list_numbered,
+                  size: 16,
+                  color: Colors.grey[700],
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  "Posts Limit",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: TextField(
+              controller: _limitController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                hintText: "1-200",
+                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                isDense: true,
+              ),
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

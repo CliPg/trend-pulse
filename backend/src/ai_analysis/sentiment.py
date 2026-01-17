@@ -250,19 +250,22 @@ class SentimentAnalyzer:
                 flattened.extend(batch_results)
             return flattened
 
-        # Execute Map-Reduce
-        final_results = await processor.reduce_phase(
+        # Execute Map-Reduce properly: first map phase, then reduce phase
+        self.logger.start_operation("sentiment_batch_map")
+
+        # Map phase: process batches concurrently
+        map_results = await processor.map_phase(
             batches,
             map_batch,
             "sentiment_batch_map"
         )
 
-        # Flatten results
-        all_results = []
-        for batch_result in final_results:
-            all_results.extend(batch_result)
+        # Reduce phase: flatten results
+        final_results = await reduce_batch(map_results)
 
-        return all_results
+        self.logger.end_operation("sentiment_batch_map")
+
+        return final_results
 
     async def _analyze_individually(self, texts: List[str]) -> List[Dict]:
         """Fallback: analyze each text individually."""
