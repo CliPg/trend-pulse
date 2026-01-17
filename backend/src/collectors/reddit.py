@@ -177,7 +177,10 @@ class RedditCollector(BaseCollector):
 
     def _fetch_post_content(self, driver, post_url: str) -> str:
         """
-        Fetch full content from a post detail page.
+        Fetch full content from a post detail page using optimized selectors.
+
+        Based on diagnostic results, Reddit uses Shadow DOM with slot-based content.
+        The best selector is [slot="text-body"] which captures the post body.
 
         Args:
             driver: Selenium WebDriver instance
@@ -193,33 +196,44 @@ class RedditCollector(BaseCollector):
         content = ""
 
         try:
-            self.logger.debug(f"Fetching full content from: {post_url}")
+            self.logger.debug(f"Fetching content from: {post_url}")
             driver.get(post_url)
 
             # Wait for page to load
             time.sleep(3)
 
-            # Try multiple selectors for post content
+            # Optimized selectors based on diagnostic results
+            # Priority: text-body slot > md class > fallback to full post
             content_selectors = [
-                '[data-testid="post-content"] div[data-adclicklocation="body"]',
-                '[data-testid="post-content"] div',
-                'div[data-click-id="text"]',
-                '.usertext-body',
-                '[data-testid="comment-body"]',  # Fallback
+                '[slot="text-body"]',  # Best: directly targets post body slot
+                'div[slot="text-body"]',  # Alternative: div with text-body slot
+                '.md',  # Fallback: markdown content class
             ]
 
-            for selector in content_selectors:
+            for i, selector in enumerate(content_selectors, 1):
                 try:
-                    content_element = driver.find_element(By.CSS_SELECTOR, selector)
-                    content = content_element.text
-                    if content and len(content) > 50:  # Ensure we got substantial content
-                        self.logger.debug(f"Fetched {len(content)} characters of content")
-                        break
-                except NoSuchElementException:
+                    elements = driver.find_elements(By.CSS_SELECTOR, selector)
+
+                    if elements:
+                        # Get the first element with substantial content
+                        for elem in elements:
+                            text = elem.text.strip()
+                            if text and len(text) > 20:  # Minimum content length
+                                content = text
+                                self.logger.info(f"Fetched {len(content)} chars.")
+                                break
+
+                        if content:
+                            break
+                    else:
+                        self.logger.debug(f"Selector #{i} found no elements: {selector}")
+
+                except Exception as e:
+                    self.logger.debug(f"Selector #{i} failed: {e}")
                     continue
 
             if not content:
-                self.logger.warning(f"Could not extract full content from {post_url}")
+                self.logger.warning(f"⚠️  Could not extract substantial content from {post_url}")
 
         except Exception as e:
             self.logger.error(f"Error fetching post content: {e}")
@@ -228,8 +242,8 @@ class RedditCollector(BaseCollector):
             try:
                 driver.get(original_url)
                 time.sleep(2)
-            except:
-                pass
+            except Exception as e:
+                self.logger.debug(f"Error returning to original page: {e}")
 
         return content
 
@@ -386,11 +400,11 @@ class RedditCollector(BaseCollector):
         posts = []
 
         if self.fetch_full_content:
-            self.logger.info(f"Phase 2: Fetching full content for {len(posts_info)} posts...")
+            self.logger.info(f"Phase 2: Fetching content for {len(posts_info)} posts...")
 
             for i, post_info in enumerate(posts_info, 1):
                 try:
-                    self.logger.info(f"Fetching full content for post {i}/{len(posts_info)}")
+                    self.logger.info(f"Fetching content for post {i}/{len(posts_info)}")
 
                     # Fetch full content from detail page
                     full_content = post_info['preview_content']

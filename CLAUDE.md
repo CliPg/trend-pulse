@@ -107,9 +107,9 @@ flutter test
 ## Key Implementation Considerations
 
 ### Scraping Strategies
-- **Reddit**: Use official API via `praw` library
+- **Reddit**: Use Selenium
 - **YouTube**: Prioritize transcript/caption data (contains valuable opinions)
-- **X/Twitter**: Use Nitter mirror sites or headless browsers (anti-scraping challenges)
+- **X/Twitter**: Use Selenium
 
 ### AI Prompt Design
 - Chain-of-thought processing for sentiment analysis
