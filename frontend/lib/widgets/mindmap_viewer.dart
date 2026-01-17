@@ -120,6 +120,39 @@ class _MindMapViewerState extends State<MindMapViewer> {
             pointer-events: none;
             opacity: 0.85;
         }
+        .zoom-controls {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            z-index: 1000;
+        }
+        .zoom-btn {
+            width: 32px;
+            height: 32px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: 600;
+            color: #6366f1;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+        }
+        .zoom-btn:hover {
+            background: white;
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .zoom-btn:active {
+            transform: scale(0.95);
+        }
         .loading {
             position: absolute;
             top: 50%;
@@ -150,9 +183,9 @@ class _MindMapViewerState extends State<MindMapViewer> {
         <div style="margin-bottom: 12px;">
             <svg width="40" height="40" viewBox="0 0 40 40">
                 <circle cx="20" cy="20" r="16" fill="none" stroke="#e2e8f0" stroke-width="4"/>
-                <circle cx="20" cy="20" r="16" fill="none" stroke="#6366f1" stroke-width="4" 
+                <circle cx="20" cy="20" r="16" fill="none" stroke="#6366f1" stroke-width="4"
                     stroke-dasharray="75 25" stroke-linecap="round">
-                    <animateTransform attributeName="transform" type="rotate" 
+                    <animateTransform attributeName="transform" type="rotate"
                         from="0 20 20" to="360 20 20" dur="1s" repeatCount="indefinite"/>
                 </circle>
             </svg>
@@ -161,11 +194,16 @@ class _MindMapViewerState extends State<MindMapViewer> {
     </div>
     <div id="chart"></div>
     <div id="error-container"></div>
+    <div class="zoom-controls">
+        <button class="zoom-btn" id="zoomIn" title="放大">+</button>
+        <button class="zoom-btn" id="zoomOut" title="缩小">−</button>
+        <button class="zoom-btn" id="zoomReset" title="重置">⟲</button>
+    </div>
     <div class="drag-hint">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M12 12h0"/>
         </svg>
-        You can drag.
+        Drag · Scroll
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
@@ -207,7 +245,7 @@ class _MindMapViewerState extends State<MindMapViewer> {
                         initialTreeDepth: 3,
                         animationDuration: 600,
                         animationEasing: 'cubicOut',
-                        roam: 'move',
+                        roam: true,
                         zoom: 1.0,
                         top: '5%',
                         bottom: '5%',
@@ -276,7 +314,40 @@ class _MindMapViewerState extends State<MindMapViewer> {
                 window.addEventListener('resize', function() {
                     chart.resize();
                 });
-                
+
+                // Zoom controls
+                const zoomInBtn = document.getElementById('zoomIn');
+                const zoomOutBtn = document.getElementById('zoomOut');
+                const zoomResetBtn = document.getElementById('zoomReset');
+
+                zoomInBtn.addEventListener('click', function() {
+                    const currentOption = chart.getOption();
+                    const currentZoom = currentOption.series[0].zoom || 1.0;
+                    chart.setOption({
+                        series: [{
+                            zoom: Math.min(currentZoom + 0.2, 3.0)
+                        }]
+                    });
+                });
+
+                zoomOutBtn.addEventListener('click', function() {
+                    const currentOption = chart.getOption();
+                    const currentZoom = currentOption.series[0].zoom || 1.0;
+                    chart.setOption({
+                        series: [{
+                            zoom: Math.max(currentZoom - 0.2, 0.3)
+                        }]
+                    });
+                });
+
+                zoomResetBtn.addEventListener('click', function() {
+                    chart.setOption({
+                        series: [{
+                            zoom: 1.0
+                        }]
+                    });
+                });
+
                 // Forward wheel events to parent for page scrolling
                 chartEl.addEventListener('wheel', function(e) {
                     window.parent.postMessage({
@@ -625,6 +696,39 @@ class _FullScreenMindMapState extends State<_FullScreenMindMap> {
         }
         #chart { width: 100%; height: 100%; cursor: grab; }
         #chart:active { cursor: grabbing; }
+        .zoom-controls {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            z-index: 1000;
+        }
+        .zoom-btn {
+            width: 36px;
+            height: 36px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 20px;
+            font-weight: 600;
+            color: #6366f1;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+        }
+        .zoom-btn:hover {
+            background: white;
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .zoom-btn:active {
+            transform: scale(0.95);
+        }
         .hint {
             position: absolute;
             bottom: 16px;
@@ -640,7 +744,12 @@ class _FullScreenMindMapState extends State<_FullScreenMindMap> {
 </head>
 <body>
     <div id="chart"></div>
-    <div class="hint">You can drag.</div>
+    <div class="zoom-controls">
+        <button class="zoom-btn" id="zoomIn" title="放大">+</button>
+        <button class="zoom-btn" id="zoomOut" title="缩小">−</button>
+        <button class="zoom-btn" id="zoomReset" title="重置">⟲</button>
+    </div>
+    <div class="hint">Drag · Scroll · Pinch</div>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <script>
         const treeData = ${widget.treeData};
@@ -664,7 +773,7 @@ class _FullScreenMindMapState extends State<_FullScreenMindMap> {
                 symbol: 'circle',
                 symbolSize: 12,
                 initialTreeDepth: 4,
-                roam: 'move',
+                roam: true,
                 zoom: 1.0,
                 top: '5%',
                 bottom: '5%',
@@ -700,6 +809,40 @@ class _FullScreenMindMapState extends State<_FullScreenMindMap> {
                 }
             }]
         });
+
+        // Zoom controls
+        const zoomInBtn = document.getElementById('zoomIn');
+        const zoomOutBtn = document.getElementById('zoomOut');
+        const zoomResetBtn = document.getElementById('zoomReset');
+
+        zoomInBtn.addEventListener('click', function() {
+            const currentOption = chart.getOption();
+            const currentZoom = currentOption.series[0].zoom || 1.0;
+            chart.setOption({
+                series: [{
+                    zoom: Math.min(currentZoom + 0.2, 3.0)
+                }]
+            });
+        });
+
+        zoomOutBtn.addEventListener('click', function() {
+            const currentOption = chart.getOption();
+            const currentZoom = currentOption.series[0].zoom || 1.0;
+            chart.setOption({
+                series: [{
+                    zoom: Math.max(currentZoom - 0.2, 0.3)
+                }]
+            });
+        });
+
+        zoomResetBtn.addEventListener('click', function() {
+            chart.setOption({
+                series: [{
+                    zoom: 1.0
+                }]
+            });
+        });
+
         window.addEventListener('resize', () => chart.resize());
     </script>
 </body>
