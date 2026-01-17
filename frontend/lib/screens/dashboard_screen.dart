@@ -833,23 +833,13 @@ class _DashboardScreenState extends State<DashboardScreen>
           const SizedBox(height: 24),
 
           // Mermaid Mind Map (if available)
-          if (_result?.mermaid != null) ...[
-            _buildSectionHeader("Mind Map", Icons.account_tree),
+          if (_result?.mermaid != null && _result!.mermaid!.mindmap.isNotEmpty) ...[
+            _buildSectionHeader("Opinion Mind Map", Icons.hub),
             const SizedBox(height: 12),
             _buildMermaidViewer(
               _result!.mermaid!.mindmap,
-              "${_result!.keyword} - Opinion Mind Map",
-              450,
-            ),
-            const SizedBox(height: 24),
-
-            // Mermaid Flow Chart
-            _buildSectionHeader("Sentiment Flow", Icons.timeline),
-            const SizedBox(height: 12),
-            _buildMermaidViewer(
-              _result!.mermaid!.flowchart,
-              "Posts by Sentiment",
-              400,
+              _result!.keyword,
+              600,
             ),
             const SizedBox(height: 24),
           ],
