@@ -10,6 +10,7 @@ import "../services/mock_data.dart";
 import "../widgets/half_gauge.dart";
 import "../widgets/opinion_card.dart";
 import "../widgets/post_list.dart";
+import "subscriptions_screen.dart";
 
 // Conditional import for web platform - default to stub, use web viewer only when dart:html is available
 import "../widgets/mindmap_stub.dart" if (dart.library.html) "../widgets/mindmap_viewer.dart";
@@ -228,6 +229,97 @@ class _DashboardScreenState extends State<DashboardScreen>
                 floating: false,
                 pinned: true,
                 backgroundColor: colorScheme.primary,
+                actions: [
+                  // Test Data button
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _showMockDataOptions,
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.orange.withOpacity(0.5),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.science,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                "Test Data",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Subscriptions button
+                  Padding(
+                    padding: const EdgeInsets.only(right: 16),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SubscriptionsScreen(),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.5),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.notifications_active_outlined,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                "Subscriptions",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
                 flexibleSpace: FlexibleSpaceBar(
                   title: const Text(
                     "TrendPulse",
@@ -313,45 +405,6 @@ class _DashboardScreenState extends State<DashboardScreen>
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                     color: colorScheme.primary,
-                  ),
-                ),
-                const Spacer(),
-                // Test data button
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: _showMockDataOptions,
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: Colors.orange.withOpacity(0.3),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.science,
-                            color: Colors.orange.shade700,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            "Test Data",
-                            style: TextStyle(
-                              color: Colors.orange.shade700,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
                 ),
               ],

@@ -5,7 +5,7 @@ Provides async database operations for all models.
 from typing import List, Optional
 from datetime import datetime
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy import select
 from src.database.models import Base, Post, Keyword, OpinionCluster, AnalysisJob
 
@@ -29,6 +29,32 @@ class DatabaseManager:
         """Initialize database tables."""
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
+
+    def get_session(self) -> Session:
+        """
+        Get a synchronous database session.
+        Note: This is for compatibility with existing code.
+        For async code, use async_session instead.
+        """
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker as sync_sessionmaker
+
+        # Convert async URL to sync URL
+        sync_url = str(self.engine.url).replace("+aiosqlite", "")
+
+        # Create or get sync engine
+        if not hasattr(self, '_sync_engine'):
+            self._sync_engine = create_engine(sync_url)
+            self._sync_session_maker = sync_sessionmaker(bind=self._sync_engine)
+
+        return self._sync_session_maker()
+
+    def close_sync(self):
+        """Close the sync engine and dispose of all sessions."""
+        if hasattr(self, '_sync_engine'):
+            self._sync_engine.dispose()
+            delattr(self, '_sync_engine')
+            delattr(self, '_sync_session_maker')
 
     async def create_keyword(self, keyword: str, language: str = "en") -> Keyword:
         """
