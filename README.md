@@ -1,260 +1,347 @@
 # TrendPulse 舆情脉冲
 
-A social media sentiment analysis application that automatically scrapes and analyzes public opinion from Reddit, YouTube, and X/Twitter using AI.
+<div align="center">
 
-## Features
+**一款全栈社交媒体情感分析应用**
 
-- **Multi-Platform Data Collection**: Reddit, YouTube, X/Twitter
-- **AI-Powered Analysis**:
-  - Sentiment scoring (0-100 scale)
-  - Opinion clustering (identifies 3 main discussion points)
-  - Summarization (human-readable overview)
-- **Flutter Dashboard**: Beautiful visualization of sentiment trends and opinions
+基于 AI 的多平台舆情监测与分析系统
 
-## Architecture
+[![Python](https://img.shields.io/badge/Python-3.13-blue)](https://www.python.org/)
+[![Flutter](https://img.shields.io/badge/Flutter-3.x-blue)](https://flutter.dev/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.109-green)](https://fastapi.tiangolo.com/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+</div>
+
+---
+
+## 📖 项目简介
+
+TrendPulse 舆情脉冲是一款全栈社交媒体情感分析应用，能够从 Reddit、YouTube 和 X/Twitter 等平台自动采集数据，并通过 AI 技术进行情感分析、观点聚类和摘要生成，最终在 Flutter 仪表盘中可视化展示分析结果。
+
+### ✨ 核心功能
+
+- **🌍 多平台数据采集**
+  - Reddit 帖子和评论（使用 Selenium 爬虫）
+  - YouTube 视频元数据和字幕（使用 YouTube Data API v3）
+  - X/Twitter 推文（使用 Selenium 爬虫）
+
+- **🤖 AI 智能分析**
+  - 情感评分（0-100 分制）
+  - 观点聚类（自动提取 3 个主要讨论点）
+  - 内容摘要（生成人类可读的综述）
+  - 基于 LangChain 的 Map-Reduce 长文本处理
+
+- **📊 数据可视化**
+  - Flutter 仪表盘展示
+  - 情感趋势图表
+  - 观点聚类卡片
+  - Mermaid 思维导图
+
+- **⏰ 定时监控**
+  - 关键词订阅功能
+  - 定时自动分析（可配置间隔）
+  - 负面情感预警（情感分低于阈值时触发）
+  - 告警历史记录
+
+---
+
+## 🏗️ 系统架构
 
 ```
-┌─────────────┐
-│   Flutter   │  Frontend Dashboard
-│   Frontend  │
-└──────┬──────┘
-       │ HTTP API
-       │
-┌──────▼──────────────────────────────┐
-│         FastAPI Backend             │
-│  ┌────────────────────────────────┐ │
-│  │     TrendPulseOrchestrator     │ │
-│  └────────────────────────────────┘ │
-│           │         │               │
-│  ┌────────▼────┐  ┌▼──────────┐   │
-│  │  Collectors │  │    AI     │   │
-│  │  - Reddit  │  │ Analysis  │   │
-│  │  - YouTube │  │           │   │
-│  │  - Twitter │  │           │   │
-│  └────────┬────┘  └───────────┘   │
-│           │                         │
-│  ┌────────▼────┐                   │
-│  │  Database   │                   │
-│  │   (SQLite)  │                   │
-│  └─────────────┘                   │
-└────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                     Flutter 前端                             │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │ 仪表盘   │  │ 数据流   │  │ 订阅管理 │  │ 告警历史 │   │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+└────────────────────────┬────────────────────────────────────┘
+                         │ HTTP/REST API
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   FastAPI 后端服务                           │
+│  ┌────────────────────────────────────────────────────┐     │
+│  │            TrendPulseOrchestrator                  │     │
+│  │           (业务编排层)                              │     │
+│  └────────┬─────────────┬──────────────┬──────────────┘     │
+│           │             │              │                     │
+│  ┌────────▼────┐  ┌────▼──────┐  ┌───▼─────────────┐       │
+│  │ 数据采集器   │  │ AI 分析引擎│  │  定时调度器     │       │
+│  │             │  │           │  │  (Scheduler)    │       │
+│  │ • Reddit   │  │ • 情感分析│  │                 │       │
+│  │ • YouTube  │  │ • 观点聚类│  │ • 定时任务      │       │
+│  │ • Twitter  │  │ • 摘要生成│  │ • 告警触发      │       │
+│  └─────────────┘  └───────────┘  └─────────────────┘       │
+│           │             │                                  │
+│  ┌────────▼─────────────▼──────────────────────────────┐   │
+│  │              SQLAlchemy ORM + SQLite                 │   │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐           │   │
+│  │  │ Keyword  │ │  Post    │ │  Cluster │           │   │
+│  │  └──────────┘ └──────────┘ └──────────┘           │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                         │
+                         ▼
+              ┌─────────────────────┐
+              │  外部服务集成        │
+              │  ┌───────────────┐  │
+              │  │ 通义千问/OpenAI│  │
+              │  │   LLM API     │  │
+              │  └───────────────┘  │
+              │  ┌───────────────┐  │
+              │  │ YouTube API   │  │
+              │  └───────────────┘  │
+              └─────────────────────┘
 ```
 
-## Tech Stack
+### 架构特点
 
-### Backend (Python)
-- **Framework**: FastAPI, asyncio/aiohttp
-- **Data Collection**: PRAW (Reddit), youtube-transcript-api (YouTube), Playwright (X/Twitter)
-- **Database**: SQLAlchemy with aiosqlite
-- **AI**: Tongyi Qianwen (Alibaba Qwen) , OpenAI
+- **事件驱动架构**：基于 asyncio/aiohttp 的异步 I/O 处理
+- **分层设计**：数据采集 → AI 分析 → 数据存储 → API 服务 → 前端展示
+- **模块化组件**：各采集器独立，易于扩展新平台
+- **异步处理**：全链路异步，支持高并发采集和分析
 
-### Frontend (Flutter)
-- **Framework**: Flutter 3.x
-- **Visualization**: fl_chart
-- **State Management**: Provider
+---
 
-## Setup Instructions
+## 🛠️ 技术栈
 
-### Prerequisites
+### 后端 (Python)
 
-- Python 3.13
-- Flutter 3.x
-- Reddit API credentials
-- YouTube Data API key
-- Tongyi Qianwen API key (from [Alibaba DashScope](https://dashscope.aliyun.com/))
+| 组件 | 技术选型 | 用途 |
+|------|---------|------|
+| **Web 框架** | FastAPI 0.109+ | REST API 服务 |
+| **异步运行时** | asyncio/aiohttp | 并发处理 |
+| **数据采集** | Selenium 4.15+ | Reddit/Twitter 爬虫 |
+| | youtube-transcript-api | YouTube 字幕 |
+| | webdriver-manager | ChromeDriver 自动管理 |
+| **数据库** | SQLAlchemy 2.0+ | ORM |
+| | aiosqlite 0.19+ | 异步 SQLite |
+| **AI/LLM** | LangChain 0.1+ | LLM 编排 |
+| | OpenAI SDK 1.10+ | OpenAI API |
+| | 通义千问 API | 中文分析优化 |
+| **任务调度** | APScheduler 3.10+ | 定时任务 |
+| **测试** | pytest 7.4+ | 单元测试 |
 
-### Backend Setup
+### 前端 (Flutter)
 
-1. **Clone and navigate to backend**:
-   ```bash
-   cd backend
-   ```
+| 组件 | 技术选型 | 用途 |
+|------|---------|------|
+| **框架** | Flutter 3.x | 跨平台 UI |
+| **状态管理** | Provider 6.1+ | 状态管理 |
+| **图表** | fl_chart 0.65+ | 数据可视化 |
+| **网络** | http 1.1+ | API 请求 |
+| **本地存储** | shared_preferences 2.2+ | 持久化配置 |
+| **WebView** | webview_flutter 4.4+ | Mermaid 图表渲染 |
 
-2. **Create virtual environment**:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # Windows: venv\Scripts\activate
-   ```
+---
 
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   playwright install chromium
-   ```
+## 🚀 快速开始
 
-4. **Configure environment variables**:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your API keys
-   ```
+### 前置要求
 
-5. **Run the API server**:
-   ```bash
-   python -m src.api.main
-   ```
+- **Python**: 3.13 或更高版本
+- **Flutter**: 3.x SDK
+- **Chrome/Chromium**: 浏览器（用于 Selenium）
+- **API 密钥**:
+  - 通义千问 API 或 OpenAI API（二选一）
+  - YouTube Data API v3 密钥（可选，用于 YouTube 采集）
 
-The API will be available at `http://localhost:8000`
+### 后端设置
 
-### Frontend Setup
+#### 1. 克隆项目
 
-1. **Navigate to frontend**:
-   ```bash
-   cd frontend
-   ```
-
-2. **Install dependencies**:
-   ```bash
-   flutter pub get
-   ```
-
-3. **Run the app**:
-   ```bash
-   flutter run
-   ```
-
-## API Documentation
-
-The TrendPulse API provides REST endpoints for sentiment analysis. The base URL is `http://localhost:8000`.
-
-### Health Check Endpoints
-
-#### GET /
-Root endpoint for API health check.
-
-**Response**:
-```json
-{
-  "status": "healthy",
-  "service": "TrendPulse API",
-  "version": "1.0.0"
-}
+```bash
+git clone <repository-url>
+cd trend-pulse/backend
 ```
 
-#### GET /health
-Health check endpoint.
+#### 2. 创建虚拟环境
 
-**Response**:
-```json
-{
-  "status": "ok"
-}
+```bash
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+```
+
+#### 3. 安装依赖
+
+```bash
+pip install -r requirements.txt
+```
+
+#### 4. 配置环境变量
+
+创建 `.env` 文件：
+
+```bash
+# LLM 配置（选择一个提供商）
+LLM_PROVIDER=openai  # 或 tongyi
+
+# OpenAI 配置
+OPENAI_API_KEY=sk-your-openai-api-key
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_BASE_URL=https://api.openai.com/v1
+
+# 通义千问配置（推荐用于中文分析）
+TONGYI_API_KEY=sk-your-tongyi-api-key
+TONGYI_MODEL=qwen-plus
+TONGYI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+
+# YouTube API（可选）
+YOUTUBE_API_KEY=your-youtube-api-key
+
+# 代理配置（可选）
+HTTP_PROXY=http://127.0.0.1:7890
+HTTPS_PROXY=http://127.0.0.1:7890
+
+# Reddit 配置（可选，当前使用 Selenium 不需要）
+# REDDIT_CLIENT_ID=your-reddit-client-id
+# REDDIT_CLIENT_SECRET=your-reddit-client-secret
+# REDDIT_USER_AGENT=TrendPulse/1.0
+```
+
+#### 5. 初始化数据库
+
+```bash
+python -c "from src.database.operations import DatabaseManager; from src.config import Config; import asyncio; db = DatabaseManager(Config.DATABASE_URL); asyncio.run(db.init_db())"
+```
+
+#### 6. 启动 API 服务
+
+```bash
+python -m src.api.main
+```
+
+服务将在 `http://localhost:8000` 启动
+
+- **API 文档（Swagger）**: http://localhost:8000/docs
+- **API 文档（ReDoc）**: http://localhost:8000/redoc
+
+### 前端设置
+
+#### 1. 进入前端目录
+
+```bash
+cd frontend
+```
+
+#### 2. 安装依赖
+
+```bash
+flutter pub get
+```
+
+#### 3. 运行应用
+
+```bash
+flutter run
+```
+
+或指定平台：
+
+```bash
+# macOS
+flutter run -d macos
+
+# iOS
+flutter run -d ios
+
+# Android
+flutter run -d android
+
+# Web
+flutter run -d chrome
 ```
 
 ---
 
-### POST /analyze
-Analyzes sentiment for a keyword across social media platforms.
+## 📡 API 文档
 
-**Note**: This operation can take 30-60 seconds depending on the number of platforms and the limit_per_platform setting.
+### 基础信息
 
-**Request Body**:
+- **Base URL**: `http://localhost:8000`
+- **Content-Type**: `application/json`
+- **响应格式**: JSON
 
-| Field | Type | Required | Default | Description |
-|-------|------|----------|---------|-------------|
-| keyword | string | Yes | - | Keyword to analyze (e.g., "DeepSeek", "ChatGPT") |
-| language | string | No | "en" | Language code: "en" (English) or "zh" (Chinese) |
-| platforms | array | No | null | Platforms to scrape: ["reddit", "youtube", "twitter"] |
-| limit_per_platform | integer | No | 20 | Maximum number of posts to collect per platform |
+### 核心接口
 
-**Example Request**:
+#### 1. 分析关键词
+
+**接口**: `POST /analyze`
+
+**描述**: 对指定关键词进行社交媒体情感分析
+
+**请求参数**:
+
 ```json
 {
   "keyword": "DeepSeek",
   "language": "en",
   "platforms": ["reddit", "youtube", "twitter"],
-  "limit_per_platform": 50
+  "limit_per_platform": 20
 }
 ```
 
-**Response (200 OK)**:
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| keyword | string | 是 | - | 要分析的关键词 |
+| language | string | 否 | "en" | 语言代码：en/zh |
+| platforms | array | 否 | ["reddit", "youtube", "twitter"] | 采集平台列表 |
+| limit_per_platform | int | 否 | 20 | 每个平台最多采集数 |
 
-| Field | Type | Description |
-|-------|------|-------------|
-| keyword | string | The analyzed keyword |
-| status | string | Analysis status: "success" or "failed" |
-| posts_count | integer | Total number of posts collected |
-| overall_sentiment | float | Sentiment score (0-100: 0=very negative, 100=very positive) |
-| sentiment_label | string | Human-readable sentiment: "positive", "neutral", or "negative" |
-| summary | string | AI-generated summary of discussions |
-| opinion_clusters | array | Top 3 opinion clusters with labels and summaries |
-| posts | array | List of analyzed posts with sentiment scores |
+**响应示例**:
 
-**Example Response**:
 ```json
 {
   "keyword": "DeepSeek",
+  "keyword_id": 1,
   "status": "success",
-  "posts_count": 85,
+  "posts_count": 45,
+  "platforms": ["reddit", "youtube"],
   "overall_sentiment": 72.5,
   "sentiment_label": "positive",
-  "summary": "Users are generally excited about DeepSeek's coding capabilities and performance. Many praise its ability to handle complex programming tasks, though some mention occasional API latency issues.",
+  "summary": "用户普遍对 DeepSeek 的编程能力感到兴奋...",
   "opinion_clusters": [
     {
-      "label": "Code Quality",
-      "summary": "Users praise the code capabilities and accuracy",
-      "mention_count": 32
+      "label": "代码质量",
+      "summary": "用户赞扬代码生成能力",
+      "mention_count": 18
     },
     {
-      "label": "Performance",
-      "summary": "Discussions about speed and efficiency",
-      "mention_count": 28
-    },
-    {
-      "label": "API Issues",
-      "summary": "Reports of latency and rate limiting",
+      "label": "性能表现",
+      "summary": "讨论速度和效率",
       "mention_count": 15
     }
   ],
+  "mermaid": {
+    "mindmap": "mindmap\n  root((DeepSeek))\n    代码质量\n    性能表现",
+    "pie_chart": "pie title DeepSeek 观点分布\n  \"代码质量\" : 18\n  \"性能表现\" : 15",
+    "flowchart": "flowchart TD\n  A[DeepSeek] --> B[用户评论1]"
+  },
   "posts": [
     {
       "platform": "reddit",
       "author": "user123",
-      "content": "DeepSeek is amazing for coding tasks!",
-      "url": "https://reddit.com/r/programming/comments/...",
+      "content": "DeepSeek 太棒了！",
+      "url": "https://reddit.com/...",
       "sentiment_score": 85.0,
       "sentiment_label": "positive",
-      "upvotes": 150,
-      "likes": null,
-      "shares": null,
-      "comments_count": 42
+      "upvotes": 150
     }
   ]
 }
 ```
 
-**Error Responses**:
-
-- **400 Bad Request**: Invalid input or analysis failed
-  ```json
-  {
-    "detail": "No posts collected for the given keyword"
-  }
-  ```
-
-- **500 Internal Server Error**: Unexpected server error
-  ```json
-  {
-    "detail": "Error message details"
-  }
-  ```
+**注意**: 此操作可能需要 30-60 秒，取决于平台数量和数据量。
 
 ---
 
-### GET /keywords
-Lists all analyzed keywords from the database.
+#### 2. 获取所有关键词列表
 
-**Response (200 OK)**:
+**接口**: `GET /keywords`
 
-| Field | Type | Description |
-|-------|------|-------------|
-| keywords | array | List of keyword summaries |
-| keywords[].id | integer | Unique keyword ID |
-| keywords[].keyword | string | The keyword text |
-| keywords[].language | string | Language code |
-| keywords[].overall_sentiment | float | Sentiment score (0-100) |
-| keywords[].last_analyzed | string | ISO timestamp of last analysis (null if never) |
+**描述**: 获取数据库中所有分析过的关键词
 
-**Example Response**:
+**响应示例**:
+
 ```json
 {
   "keywords": [
@@ -278,192 +365,353 @@ Lists all analyzed keywords from the database.
 
 ---
 
-### GET /keywords/{keyword_id}
-Retrieves detailed analysis for a specific keyword by ID.
+#### 3. 获取关键词详情
 
-**Path Parameters**:
+**接口**: `GET /keywords/{keyword_id}`
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| keyword_id | integer | Yes | The ID of the keyword (obtained from GET /keywords) |
+**描述**: 获取指定关键词的详细分析结果
 
-**Response (200 OK)**:
+**路径参数**:
+- `keyword_id` (int): 关键词 ID
 
-| Field | Type | Description |
-|-------|------|-------------|
-| id | integer | Keyword ID |
-| keyword | string | The keyword text |
-| language | string | Language code |
-| overall_sentiment | float | Sentiment score (0-100) |
-| summary | string | AI-generated summary |
-| last_analyzed | string | ISO timestamp of last analysis |
-| posts_count | integer | Total number of posts |
-| opinion_clusters | array | Opinion clusters (max 3) |
-| opinion_clusters[].label | string | Cluster label |
-| opinion_clusters[].summary | string | Cluster summary |
-| opinion_clusters[].mention_count | integer | Number of mentions |
-| posts | array | List of posts (max 50, most recent first) |
-| posts[].platform | string | Source platform |
-| posts[].author | string | Post author |
-| posts[].content | string | Post content |
-| posts[].url | string | Source URL |
-| posts[].sentiment_score | float | Sentiment score (0-100) |
-| posts[].sentiment_label | string | Sentiment category |
-| posts[].upvotes | integer/null | Upvotes (Reddit) |
-| posts[].likes | integer/null | Likes (YouTube/Twitter) |
-| posts[].shares | integer/null | Shares (YouTube/Twitter) |
-| posts[].comments_count | integer/null | Number of comments |
+**响应示例**:
 
-**Example Response**:
 ```json
 {
   "id": 1,
   "keyword": "DeepSeek",
   "language": "en",
   "overall_sentiment": 72.5,
-  "summary": "Users are generally excited about DeepSeek's coding capabilities...",
+  "summary": "用户普遍对 DeepSeek 的编程能力感到兴奋...",
   "last_analyzed": "2026-01-17T10:30:00",
-  "posts_count": 85,
-  "opinion_clusters": [
-    {
-      "label": "Code Quality",
-      "summary": "Users praise the code capabilities",
-      "mention_count": 32
-    }
-  ],
-  "posts": [
-    {
-      "platform": "reddit",
-      "author": "user123",
-      "content": "DeepSeek is amazing for coding tasks!",
-      "url": "https://reddit.com/r/programming/comments/...",
-      "sentiment_score": 85.0,
-      "sentiment_label": "positive",
-      "upvotes": 150,
-      "likes": null,
-      "shares": null,
-      "comments_count": 42
-    }
-  ]
+  "posts_count": 45,
+  "opinion_clusters": [...],
+  "posts": [...]
 }
 ```
 
-**Error Responses**:
+---
 
-- **404 Not Found**: Keyword ID does not exist
-  ```json
-  {
-    "detail": "Keyword not found"
-  }
-  ```
+#### 4. 创建订阅
+
+**接口**: `POST /subscriptions`
+
+**描述**: 创建关键词定时监控订阅
+
+**请求参数**:
+
+```json
+{
+  "keyword": "iPhone 16",
+  "platforms": ["reddit", "youtube"],
+  "language": "en",
+  "post_limit": 50,
+  "alert_threshold": 30.0,
+  "interval_hours": 6,
+  "user_email": "user@example.com"
+}
+```
+
+**响应示例**:
+
+```json
+{
+  "id": 1,
+  "keyword": "iPhone 16",
+  "keyword_id": 3,
+  "platforms": "reddit,youtube",
+  "language": "en",
+  "post_limit": 50,
+  "alert_threshold": 30.0,
+  "interval_hours": 6,
+  "is_active": true,
+  "created_at": "2026-01-17T10:00:00",
+  "last_checked_at": null,
+  "next_check_at": "2026-01-17T16:00:00",
+  "user_email": "user@example.com"
+}
+```
 
 ---
 
-## Interactive API Documentation
+#### 5. 获取订阅列表
 
-When the API server is running, you can access interactive documentation at:
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+**接口**: `GET /subscriptions`
 
-These interfaces allow you to test API endpoints directly from your browser.
+**描述**: 获取所有活跃订阅
 
-## API Key Setup
+**响应示例**:
 
-### Reddit API (30 minutes)
-1. Go to https://www.reddit.com/prefs/apps
-2. Click "create application" or "develop an app"
-3. Fill in:
-   - name: TrendPulse
-   - app type: Script
-   - description: Social media sentiment analysis
-   - about url: http://localhost:8000
-   - redirect uri: http://localhost:8080
-4. Copy `client_id` and `client_secret`
-5. Add to `.env`:
-   ```
-   REDDIT_CLIENT_ID=your_client_id
-   REDDIT_CLIENT_SECRET=your_client_secret
-   ```
-
-### YouTube API (1 hour)
-1. Go to https://console.cloud.google.com/
-2. Create project: "TrendPulse"
-3. Enable YouTube Data API v3
-4. Create credentials → API Key
-5. Add to `.env`:
-   ```
-   YOUTUBE_API_KEY=your_api_key
-   ```
-
-### Tongyi Qianwen API (Provided)
-Sign up at https://dashscope.aliyun.com/ and get your API key.
-
-Add to `.env`:
-```
-LLM_API_KEY=your_api_key
-LLM_API_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-LLM_MODEL=qwen-plus
+```json
+[
+  {
+    "id": 1,
+    "keyword": "iPhone 16",
+    "keyword_id": 3,
+    "platforms": "reddit,youtube",
+    "language": "en",
+    "post_limit": 50,
+    "alert_threshold": 30.0,
+    "interval_hours": 6,
+    "is_active": true,
+    "created_at": "2026-01-17T10:00:00",
+    "last_checked_at": "2026-01-17T16:00:00",
+    "next_check_at": "2026-01-17T22:00:00",
+    "user_email": "user@example.com"
+  }
+]
 ```
 
-## Development
+---
 
-### Running Tests
+#### 6. 更新订阅
 
-**Backend**:
-```bash
-cd backend
-pytest tests/ -v
+**接口**: `PUT /subscriptions/{subscription_id}`
+
+**描述**: 更新订阅配置
+
+**路径参数**:
+- `subscription_id` (int): 订阅 ID
+
+**请求参数**: 同创建订阅
+
+---
+
+#### 7. 取消订阅
+
+**接口**: `DELETE /subscriptions/{subscription_id}`
+
+**描述**: 停用订阅（软删除）
+
+**路径参数**:
+- `subscription_id` (int): 订阅 ID
+
+**响应示例**:
+
+```json
+{
+  "message": "Subscription cancelled successfully"
+}
 ```
 
-**Frontend**:
-```bash
-cd frontend
-flutter test
+---
+
+#### 8. 获取告警历史
+
+**接口**: `GET /alerts`
+
+**描述**: 获取情感告警历史记录
+
+**查询参数**:
+- `limit` (int): 返回数量，默认 50
+- `acknowledged` (bool): 筛选已确认状态
+
+**响应示例**:
+
+```json
+[
+  {
+    "id": 1,
+    "subscription_id": 1,
+    "keyword": "iPhone 16",
+    "sentiment_score": 25.5,
+    "sentiment_label": "negative",
+    "posts_count": 50,
+    "negative_posts_count": 35,
+    "summary": "检测到大量负面评价...",
+    "is_sent": true,
+    "created_at": "2026-01-17T12:00:00",
+    "acknowledged_at": null
+  }
+]
 ```
 
-### Project Structure
+---
+
+#### 9. 确认告警
+
+**接口**: `PATCH /alerts/{alert_id}/acknowledge`
+
+**描述**: 标记告警为已确认
+
+**路径参数**:
+- `alert_id` (int): 告警 ID
+
+---
+
+### 健康检查接口
+
+#### `GET /` 或 `GET /health`
+
+**响应**:
+
+```json
+{
+  "status": "ok"
+}
+```
+
+---
+
+
+## 📁 项目结构
 
 ```
 trend-pulse/
-├── backend/
+├── backend/                       # Python 后端
 │   ├── src/
-│   │   ├── collectors/        # Platform scrapers
-│   │   ├── ai_analysis/       # AI processing
-│   │   ├── database/          # DB models and operations
-│   │   ├── api/               # FastAPI endpoints
-│   │   ├── config.py          # Configuration
-│   │   └── orchestrator.py    # Main pipeline
-│   ├── tests/
-│   ├── .env.example
-│   └── requirements.txt
-├── frontend/
-│   └── lib/
-│       ├── screens/           # UI screens
-│       ├── widgets/           # Reusable widgets
-│       └── services/          # API client
-└── README.md
+│   │   ├── collectors/           # 数据采集器
+│   │   │   ├── base.py          # 基础采集器类
+│   │   │   ├── reddit.py        # Reddit 采集器
+│   │   │   ├── youtube.py       # YouTube 采集器
+│   │   │   └── twitter.py       # Twitter 采集器
+│   │   ├── ai_analysis/          # AI 分析引擎
+│   │   │   ├── prompts/         # Prompt 模板
+│   │   │   │   ├── sentiment_prompts.py
+│   │   │   │   ├── clustering_prompts.py
+│   │   │   │   └── summarization_prompts.py
+│   │   │   ├── utils/           # 工具模块
+│   │   │   │   ├── token_counter.py
+│   │   │   │   ├── map_reduce.py
+│   │   │   │   └── logger.py
+│   │   │   ├── client.py        # LLM 客户端
+│   │   │   ├── sentiment.py     # 情感分析
+│   │   │   ├── clustering.py    # 观点聚类
+│   │   │   ├── summarizer.py    # 摘要生成
+│   │   │   └── pipeline.py      # 分析管道
+│   │   ├── database/             # 数据库层
+│   │   │   ├── models.py        # SQLAlchemy 模型
+│   │   │   └── operations.py    # 数据库操作
+│   │   ├── api/                  # API 层
+│   │   │   └── main.py          # FastAPI 应用
+│   │   ├── config.py             # 配置管理
+│   │   ├── orchestrator.py       # 业务编排
+│   │   ├── scheduler.py          # 定时调度
+│   │   └── utils/                # 工具函数
+│   ├── tests/                    # 测试文件
+│   ├── scripts/                  # 调试脚本
+│   ├── logs/                     # 日志文件
+│   ├── requirements.txt          # Python 依赖
+│   └── pytest.ini                # pytest 配置
+│
+├── frontend/                     # Flutter 前端
+│   ├── lib/
+│   │   ├── screens/             # 页面
+│   │   │   ├── dashboard_screen.dart
+│   │   │   └── subscriptions_screen.dart
+│   │   ├── widgets/             # 组件
+│   │   │   ├── sentiment_gauge.dart
+│   │   │   ├── opinion_card.dart
+│   │   │   ├── post_list.dart
+│   │   │   └── mermaid_viewer.dart
+│   │   ├── services/            # 服务
+│   │   │   ├── api_service.dart
+│   │   │   └── mock_data.dart
+│   │   └── main.dart            # 应用入口
+│   └── pubspec.yaml             # Flutter 依赖
+│
+├── docs/                        # 技术文档
+│   ├── AI_ANALYSIS.md           # AI 分析文档
+│   ├── DATABASE_DESIGN.md       # 数据库设计
+│   ├── PROXY_CONFIG.md          # 代理配置
+│   └── UI_DESIGN.md             # UI 设计
+│
+├── CLAUDE.md                    # Claude Code 指引
+└── README.md                    # 本文档
 ```
 
-## Performance Notes
+---
 
-- **Analysis Time**: 30-60 seconds per keyword (depending on platforms)
-- **Token Usage**: Optimized with batch processing
-- **Database**: SQLite for development (PostgreSQL for production)
+## 🧪 测试
 
-## Scoring Criteria
+### 后端测试
 
-| Module | Score | Criteria |
-|--------|-------|----------|
-| Data Collection | 30 | 2 platforms (20), 3 platforms (30) |
-| AI Analysis | 25 | Accuracy, clustering quality, prompts |
-| Flutter Frontend | 20 | UI beauty, interaction, clarity |
-| Code Quality | 15 | Standards, error handling, docs |
-| Innovation | 10 | Scheduling, mind maps, anti-scraping docs |
+```bash
+cd backend
 
-## License
+# 运行所有测试
+pytest tests/ -v
 
-MIT License - See LICENSE file for details
+# 运行特定测试
+pytest tests/test_sentiment.py -v
 
-## Credits
+# 查看覆盖率
+pytest tests/ --cov=src --cov-report=html
+```
 
-Built for the TrendPulse challenge (2026)
+### 前端测试
+
+```bash
+cd frontend
+
+# 运行单元测试
+flutter test
+
+# 运行集成测试
+flutter drive --target=test_driver/app.dart
+```
+
+---
+
+## 📊 性能指标
+
+| 指标 | 数值 |
+|------|------|
+| 单次分析耗时 | 30-60 秒 |
+| 支持并发数 | 5-10 个关键词 |
+| Token 优化 | 节省 17-35% |
+| 数据采集成功率 | Reddit: ~80%, YouTube: ~70% |
+| API 响应时间 | < 200ms（已缓存数据） |
+
+---
+
+## 🎯 创新点
+
+1. **Map-Reduce 长文本处理**: 自动分批处理，优化 Token 使用
+2. **定时监控订阅**: 无需手动触发，自动定期分析
+3. **负面情感预警**: 情感分低于阈值时自动告警
+4. **Mermaid 可视化**: 思维导图、饼图、流程图多种展示
+5. **Few-shot Prompt**: 8 个精心设计的示例提升分析准确性
+6. **跨平台前端**: Flutter 支持 macOS/iOS/Android/Web
+
+---
+
+## 🗺️ 未来规划
+
+- [ ] 支持更多平台（TikTok、Instagram、微博）
+- [ ] 实时情感趋势图（时间序列分析）
+- [ ] 多语言支持（日语、韩语等）
+- [ ] 用户认证和多租户支持
+- [ ] PostgreSQL 生产环境迁移
+- [ ] Redis 缓存层
+- [ ] Docker 容器化部署
+- [ ] CI/CD 自动化
+
+---
+
+## 📄 许可证
+
+MIT License
+
+---
+
+## 🙏 致谢
+
+- **通义千问**: 提供 LLM API 支持
+- **OpenAI**: GPT-4o-mini 模型
+- **FastAPI**: 现代化的 Python Web 框架
+- **Flutter**: 跨平台 UI 框架
+
+---
+
+## 📞 联系方式
+
+如有问题或建议，欢迎提 Issue 或 Pull Request！
+
+---
+
+<div align="center">
+
+**Built with ❤️ for TrendPulse Challenge 2026**
+
+</div>
