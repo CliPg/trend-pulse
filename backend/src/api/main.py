@@ -382,6 +382,76 @@ async def delete_subscription(subscription_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.put("/subscriptions/{subscription_id}", response_model=SubscriptionResponse)
+async def update_subscription(subscription_id: int, request: SubscriptionRequest):
+    """
+    Update an existing subscription.
+    Allows modifying keyword, platforms, threshold, interval, etc.
+    """
+    try:
+        from src.database.models import Keyword
+
+        with db.get_session() as session:
+            subscription = session.query(Subscription).get(subscription_id)
+
+            if not subscription:
+                raise HTTPException(status_code=404, detail="Subscription not found")
+
+            # Update platforms
+            platforms_str = ",".join(request.platforms) if request.platforms else None
+
+            # Update subscription fields
+            subscription.platforms = platforms_str
+            subscription.language = request.language
+            subscription.post_limit = request.post_limit
+            subscription.alert_threshold = request.alert_threshold
+            subscription.interval_hours = request.interval_hours
+            subscription.user_email = request.user_email
+
+            # Update keyword if changed
+            if subscription.keyword.keyword != request.keyword:
+                # Find or create new keyword
+                keyword = session.query(Keyword).filter_by(keyword=request.keyword).first()
+                if not keyword:
+                    keyword = Keyword(keyword=request.keyword, language=request.language)
+                    session.add(keyword)
+                    session.commit()
+                    session.refresh(keyword)
+
+                subscription.keyword_id = keyword.id
+
+            session.commit()
+            session.refresh(subscription)
+
+            # Reschedule with new settings
+            if scheduler:
+                await scheduler.schedule_subscription(subscription.id)
+
+            logger.info(f"Updated subscription {subscription_id}")
+
+            return SubscriptionResponse(
+                id=subscription.id,
+                keyword=subscription.keyword.keyword,
+                keyword_id=subscription.keyword_id,
+                platforms=subscription.platforms,
+                language=subscription.language,
+                post_limit=subscription.post_limit,
+                alert_threshold=subscription.alert_threshold,
+                interval_hours=subscription.interval_hours,
+                is_active=subscription.is_active,
+                created_at=subscription.created_at.isoformat(),
+                last_checked_at=subscription.last_checked_at.isoformat() if subscription.last_checked_at else None,
+                next_check_at=subscription.next_check_at.isoformat() if subscription.next_check_at else None,
+                user_email=subscription.user_email,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating subscription: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ==================== Alert Management ====================
 
 @app.get("/alerts", response_model=List[AlertResponse])

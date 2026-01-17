@@ -352,6 +352,314 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
     );
   }
 
+  Future<void> _showEditSubscriptionDialog(Subscription subscription) async {
+    final keywordController = TextEditingController(text: subscription.keyword);
+    final thresholdController = TextEditingController(text: subscription.alertThreshold.toString());
+    final intervalController = TextEditingController(text: subscription.intervalHours.toString());
+    final limitController = TextEditingController(text: subscription.postLimit.toString());
+
+    final platforms = ["reddit", "youtube", "twitter"];
+    final selectedPlatforms = (subscription.platforms?.split(",") ?? ["reddit", "youtube"]).toSet();
+    final selectedLanguage = subscription.language;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final colorScheme = Theme.of(context).colorScheme;
+
+          return AlertDialog(
+            title: const Text("Edit Subscription"),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Keyword input
+                  Row(
+                    children: [
+                      Icon(Icons.search, size: 20, color: Colors.grey[700]),
+                      const SizedBox(width: 8),
+                      const Text(
+                        "Keyword",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: keywordController,
+                    decoration: InputDecoration(
+                      hintText: "e.g., iPhone 16 Pro",
+                      filled: true,
+                      fillColor: Colors.grey[50],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide(color: colorScheme.primary, width: 2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Platforms
+                  Row(
+                    children: [
+                      Icon(Icons.dashboard, size: 20, color: Colors.grey[700]),
+                      const SizedBox(width: 8),
+                      const Text(
+                        "Platforms",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        "${selectedPlatforms.length} selected",
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    children: platforms.map((platform) {
+                      final isSelected = selectedPlatforms.contains(platform);
+                      return FilterChip(
+                        label: Text(platform.toUpperCase()),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setDialogState(() {
+                            if (selected) {
+                              selectedPlatforms.add(platform);
+                            } else {
+                              selectedPlatforms.remove(platform);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Alert Threshold
+                  Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, size: 20, color: Colors.grey[700]),
+                      const SizedBox(width: 8),
+                      const Text(
+                        "Alert Threshold",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: thresholdController,
+                    decoration: InputDecoration(
+                      hintText: "Trigger alert if sentiment below this value",
+                      filled: true,
+                      fillColor: Colors.grey[50],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide(color: colorScheme.primary, width: 2),
+                      ),
+                      suffixIcon: Container(
+                        margin: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(Icons.warning, color: Colors.orange.shade700, size: 20),
+                      ),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Check Interval
+                  Row(
+                    children: [
+                      Icon(Icons.schedule, size: 20, color: Colors.grey[700]),
+                      const SizedBox(width: 8),
+                      const Text(
+                        "Check Interval (hours)",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: intervalController,
+                    decoration: InputDecoration(
+                      hintText: "How often to check this keyword",
+                      filled: true,
+                      fillColor: Colors.grey[50],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide(color: colorScheme.primary, width: 2),
+                      ),
+                      suffixIcon: Container(
+                        margin: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(Icons.access_time, color: Colors.blue.shade700, size: 20),
+                      ),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Posts Limit
+                  Row(
+                    children: [
+                      Icon(Icons.article, size: 20, color: Colors.grey[700]),
+                      const SizedBox(width: 8),
+                      const Text(
+                        "Posts per Platform",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: limitController,
+                    decoration: InputDecoration(
+                      hintText: "Number of posts to collect each time",
+                      filled: true,
+                      fillColor: Colors.grey[50],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide(color: colorScheme.primary, width: 2),
+                      ),
+                      suffixIcon: Container(
+                        margin: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(Icons.format_list_numbered, color: Colors.green.shade700, size: 20),
+                      ),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Cancel"),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final keyword = keywordController.text.trim();
+                  if (keyword.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("Please enter a keyword")),
+                    );
+                    return;
+                  }
+
+                  try {
+                    final threshold = double.parse(thresholdController.text);
+                    final interval = int.parse(intervalController.text);
+                    final limit = int.parse(limitController.text);
+
+                    await _apiService.updateSubscription(
+                      subscriptionId: subscription.id,
+                      keyword: keyword,
+                      platforms: selectedPlatforms.toList(),
+                      language: selectedLanguage,
+                      postLimit: limit,
+                      alertThreshold: threshold,
+                      intervalHours: interval,
+                    );
+
+                    Navigator.pop(context);
+                    await _loadSubscriptions();
+
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Subscription updated: $keyword")),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Update failed: $e")),
+                      );
+                    }
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text("Save Changes"),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _deleteSubscription(Subscription subscription) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -509,6 +817,7 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
           return _SubscriptionCard(
             subscription: subscription,
             onDelete: () => _deleteSubscription(subscription),
+            onEdit: () => _showEditSubscriptionDialog(subscription),
           );
         },
       ),
@@ -519,10 +828,12 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
 class _SubscriptionCard extends StatelessWidget {
   final Subscription subscription;
   final VoidCallback onDelete;
+  final VoidCallback onEdit;
 
   const _SubscriptionCard({
     required this.subscription,
     required this.onDelete,
+    required this.onEdit,
   });
 
   String _formatDate(String? dateStr) {
@@ -641,6 +952,11 @@ class _SubscriptionCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, color: Colors.blue),
+                  onPressed: onEdit,
+                  tooltip: "Edit subscription",
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: Colors.red),

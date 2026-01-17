@@ -293,6 +293,38 @@ class ApiService {
     }
   }
 
+  Future<Subscription> updateSubscription({
+    required int subscriptionId,
+    required String keyword,
+    List<String>? platforms,
+    String language = "en",
+    int postLimit = 50,
+    double alertThreshold = 30.0,
+    int intervalHours = 6,
+    String? userEmail,
+  }) async {
+    final response = await http.put(
+      Uri.parse("$baseUrl/subscriptions/$subscriptionId"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "keyword": keyword,
+        "platforms": platforms,
+        "language": language,
+        "post_limit": postLimit,
+        "alert_threshold": alertThreshold,
+        "interval_hours": intervalHours,
+        "user_email": userEmail,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return Subscription.fromJson(jsonDecode(response.body));
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error["detail"] ?? "Failed to update subscription");
+    }
+  }
+
   Future<void> deleteSubscription(int subscriptionId) async {
     final response = await http.delete(
       Uri.parse("$baseUrl/subscriptions/$subscriptionId"),
