@@ -80,12 +80,14 @@ class _AlertHistoryWidgetState extends State<AlertHistoryWidget> {
       children: [
         // Filter bar
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: Colors.grey[100],
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          color: Colors.white,
           child: Row(
             children: [
-              const Text("Filter:", style: TextStyle(fontWeight: FontWeight.bold)),
+              Icon(Icons.filter_list, size: 20, color: Colors.grey[700]),
               const SizedBox(width: 8),
+              const Text("Filter:", style: TextStyle(fontWeight: FontWeight.w600, color: Colors.black87)),
+              const SizedBox(width: 16),
               FilterChip(
                 label: const Text("All"),
                 selected: _showAcknowledged == null,
@@ -159,9 +161,9 @@ class _AlertHistoryWidgetState extends State<AlertHistoryWidget> {
           children: [
             Icon(Icons.check_circle_outline, size: 64, color: Colors.green[200]),
             const SizedBox(height: 16),
-            Text(
+            const Text(
               "No Alerts",
-              style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 18, color: Colors.grey, fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 8),
             Text(
@@ -176,7 +178,7 @@ class _AlertHistoryWidgetState extends State<AlertHistoryWidget> {
     return RefreshIndicator(
       onRefresh: _loadAlerts,
       child: ListView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         itemCount: _alerts.length,
         itemBuilder: (context, index) {
           final alert = _alerts[index];
@@ -229,34 +231,43 @@ class _AlertCard extends StatelessWidget {
     final sentimentColor = getSentimentColor(alert.sentimentScore);
     final isAcknowledged = alert.acknowledgedAt != null;
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      elevation: isAcknowledged ? 1 : 3,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: isAcknowledged
-            ? BorderSide.none
-            : BorderSide(color: sentimentColor.withOpacity(0.5), width: 2),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 5),
+          ),
+        ],
+        border: isAcknowledged
+            ? null
+            : Border.all(color: sentimentColor.withOpacity(0.5), width: 2),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: sentimentColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     Icons.warning_amber_rounded,
                     color: sentimentColor,
+                    size: 24,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -264,17 +275,25 @@ class _AlertCard extends StatelessWidget {
                       Text(
                         alert.keyword,
                         style: const TextStyle(
-                          fontSize: 18,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
+                          color: Colors.black87,
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        _formatDate(alert.createdAt),
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 12,
-                        ),
+                      Row(
+                        children: [
+                          Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
+                          const SizedBox(width: 4),
+                          Text(
+                            _formatDate(alert.createdAt),
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -282,36 +301,43 @@ class _AlertCard extends StatelessWidget {
                 if (!isAcknowledged)
                   ElevatedButton.icon(
                     onPressed: onAcknowledge,
-                    icon: const Icon(Icons.check, size: 16),
+                    icon: const Icon(Icons.check, size: 18),
                     label: const Text("Acknowledge"),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
+
+            // Sentiment Score and Negative Posts
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: sentimentColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _StatItem(
+                  _AlertStatItem(
+                    icon: Icons.sentiment_dissatisfied,
                     label: "Sentiment",
                     value: "${alert.sentimentScore.toStringAsFixed(1)}/100",
                     color: sentimentColor,
                   ),
                   Container(
                     width: 1,
-                    height: 30,
+                    height: 40,
                     color: Colors.grey[300],
                   ),
-                  _StatItem(
+                  _AlertStatItem(
+                    icon: Icons.chat_bubble_outline,
                     label: "Negative Posts",
                     value: "${alert.negativePostsCount}/${alert.postsCount}",
                     color: Colors.orange,
@@ -319,56 +345,73 @@ class _AlertCard extends StatelessWidget {
                 ],
               ),
             ),
+
+            // Summary
             if (alert.summary != null && alert.summary!.isNotEmpty) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.description, size: 16, color: Colors.grey[700]),
-                        const SizedBox(width: 6),
-                        Text(
+                        Icon(Icons.description, size: 18, color: Colors.grey[700]),
+                        const SizedBox(width: 8),
+                        const Text(
                           "Summary",
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.grey[700],
+                            color: Colors.black87,
+                            fontSize: 16,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Text(
                       alert.summary!,
-                      style: const TextStyle(fontSize: 14),
-                      maxLines: 3,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black87,
+                        height: 1.5,
+                      ),
+                      maxLines: 4,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
             ],
+
+            // Acknowledged status
             if (isAcknowledged) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(Icons.check_circle, size: 14, color: Colors.green[700]),
-                  const SizedBox(width: 4),
-                  Text(
-                    "Acknowledged ${_formatDate(alert.acknowledgedAt!)}",
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                      fontStyle: FontStyle.italic,
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.check_circle, size: 16, color: Colors.green.shade700),
+                    const SizedBox(width: 6),
+                    Text(
+                      "Acknowledged ${_formatDate(alert.acknowledgedAt!)}",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.green.shade700,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ],
@@ -378,12 +421,14 @@ class _AlertCard extends StatelessWidget {
   }
 }
 
-class _StatItem extends StatelessWidget {
+class _AlertStatItem extends StatelessWidget {
+  final IconData icon;
   final String label;
   final String value;
   final Color color;
 
-  const _StatItem({
+  const _AlertStatItem({
+    required this.icon,
     required this.label,
     required this.value,
     required this.color,
@@ -393,20 +438,23 @@ class _StatItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
+        Icon(icon, size: 24, color: color),
+        const SizedBox(height: 6),
         Text(
           value,
           style: TextStyle(
-            fontSize: 20,
+            fontSize: 22,
             fontWeight: FontWeight.bold,
             color: color,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         Text(
           label,
           style: TextStyle(
             fontSize: 12,
             color: Colors.grey[600],
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],
