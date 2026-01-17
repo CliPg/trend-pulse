@@ -31,12 +31,28 @@ class _MindMapViewerState extends State<MindMapViewer> {
   late String _viewType;
   bool _isLoading = true;
   bool _isRegistered = false;
+  html.EventListener? _messageListener;
 
   @override
   void initState() {
     super.initState();
     _viewType = 'echarts-mindmap-${_echartsIdCounter++}';
     _initializeIframe();
+    _setupMessageListener();
+  }
+
+  void _setupMessageListener() {
+    _messageListener = (html.Event event) {
+      if (event is html.MessageEvent) {
+        final data = event.data;
+        if (data is Map && data['type'] == 'wheel') {
+          // Forward scroll to parent document
+          final deltaY = (data['deltaY'] as num?)?.toDouble() ?? 0;
+          html.window.scrollBy(0, deltaY.toInt());
+        }
+      }
+    };
+    html.window.addEventListener('message', _messageListener!);
   }
 
   void _initializeIframe() {
@@ -149,7 +165,7 @@ class _MindMapViewerState extends State<MindMapViewer> {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M12 12h0"/>
         </svg>
-        拖拽查看更多
+        You can drag.
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
@@ -260,6 +276,15 @@ class _MindMapViewerState extends State<MindMapViewer> {
                 window.addEventListener('resize', function() {
                     chart.resize();
                 });
+                
+                // Forward wheel events to parent for page scrolling
+                chartEl.addEventListener('wheel', function(e) {
+                    window.parent.postMessage({
+                        type: 'wheel',
+                        deltaY: e.deltaY,
+                        deltaX: e.deltaX
+                    }, '*');
+                }, { passive: true });
                 
             } catch (e) {
                 loadingEl.style.display = 'none';
@@ -547,6 +572,9 @@ class _MindMapViewerState extends State<MindMapViewer> {
 
   @override
   void dispose() {
+    if (_messageListener != null) {
+      html.window.removeEventListener('message', _messageListener!);
+    }
     _iframeElement.remove();
     super.dispose();
   }
@@ -612,7 +640,7 @@ class _FullScreenMindMapState extends State<_FullScreenMindMap> {
 </head>
 <body>
     <div id="chart"></div>
-    <div class="hint">🖱️ 拖拽移动 · 滚轮缩放</div>
+    <div class="hint">You can drag.</div>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <script>
         const treeData = ${widget.treeData};
