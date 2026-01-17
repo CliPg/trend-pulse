@@ -48,8 +48,8 @@ def main():
 
     try:
         # 访问网页
-        print("正在访问 https://x.com/explore ...")
-        driver.get("https://x.com/explore")
+        print("正在访问 https://www.reddit.com/ ...")
+        driver.get("https://www.reddit.com/")
 
         print(f"页面标题: {driver.title}")
         print(f"当前 URL: {driver.current_url}")
