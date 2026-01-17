@@ -150,7 +150,7 @@ TrendPulse 舆情脉冲是一款全栈社交媒体情感分析应用，能够从
 #### 1. 克隆项目
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/CliPg/trend-pulse.git
 cd trend-pulse/backend
 ```
 
@@ -182,20 +182,11 @@ OPENAI_BASE_URL=https://api.openai.com/v1
 
 # 通义千问配置（推荐用于中文分析）
 TONGYI_API_KEY=sk-your-tongyi-api-key
-TONGYI_MODEL=qwen-plus
+TONGYI_MODEL=qwen3-max
 TONGYI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 
 # YouTube API（可选）
 YOUTUBE_API_KEY=your-youtube-api-key
-
-# 代理配置（可选）
-HTTP_PROXY=http://127.0.0.1:7890
-HTTPS_PROXY=http://127.0.0.1:7890
-
-# Reddit 配置（可选，当前使用 Selenium 不需要）
-# REDDIT_CLIENT_ID=your-reddit-client-id
-# REDDIT_CLIENT_SECRET=your-reddit-client-secret
-# REDDIT_USER_AGENT=TrendPulse/1.0
 ```
 
 #### 5. 初始化数据库
@@ -639,29 +630,7 @@ pytest tests/test_sentiment.py -v
 pytest tests/ --cov=src --cov-report=html
 ```
 
-### 前端测试
-
-```bash
-cd frontend
-
-# 运行单元测试
-flutter test
-
-# 运行集成测试
-flutter drive --target=test_driver/app.dart
 ```
-
----
-
-## 📊 性能指标
-
-| 指标 | 数值 |
-|------|------|
-| 单次分析耗时 | 30-60 秒 |
-| 支持并发数 | 5-10 个关键词 |
-| Token 优化 | 节省 17-35% |
-| 数据采集成功率 | Reddit: ~80%, YouTube: ~70% |
-| API 响应时间 | < 200ms（已缓存数据） |
 
 ---
 
@@ -676,31 +645,11 @@ flutter drive --target=test_driver/app.dart
 
 ---
 
-## 🗺️ 未来规划
-
-- [ ] 支持更多平台（TikTok、Instagram、微博）
-- [ ] 实时情感趋势图（时间序列分析）
-- [ ] 多语言支持（日语、韩语等）
-- [ ] 用户认证和多租户支持
-- [ ] PostgreSQL 生产环境迁移
-- [ ] Redis 缓存层
-- [ ] Docker 容器化部署
-- [ ] CI/CD 自动化
-
----
 
 ## 📄 许可证
 
 MIT License
 
----
-
-## 🙏 致谢
-
-- **通义千问**: 提供 LLM API 支持
-- **OpenAI**: GPT-4o-mini 模型
-- **FastAPI**: 现代化的 Python Web 框架
-- **Flutter**: 跨平台 UI 框架
 
 ---
 
