@@ -394,21 +394,46 @@ class _SubscriptionsScreenState extends State<SubscriptionsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return DefaultTabController(
       length: 2,
       child: Scaffold(
         backgroundColor: const Color(0xFFF8F9FA),
         appBar: AppBar(
-          title: const Text("Subscription Manager"),
-          bottom: const TabBar(
-            tabs: [
+          title: const Text(
+            "Subscription Manager",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              fontSize: 22,
+            ),
+          ),
+          backgroundColor: colorScheme.primary,
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  colorScheme.primary,
+                  colorScheme.secondary,
+                ],
+              ),
+            ),
+          ),
+          bottom: TabBar(
+            labelColor: Colors.white70,
+            unselectedLabelColor: Colors.white54,
+            indicatorColor: Colors.white,
+            tabs: const [
               Tab(text: "My Subscriptions", icon: Icon(Icons.notifications_active)),
               Tab(text: "Alert History", icon: Icon(Icons.history)),
             ],
           ),
           actions: [
             IconButton(
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(Icons.refresh, color: Colors.white),
               onPressed: _loadSubscriptions,
               tooltip: "Refresh",
             ),
@@ -519,6 +544,35 @@ class _SubscriptionCard extends StatelessWidget {
     }
   }
 
+  Map<String, dynamic> _getPlatformInfo(String platform) {
+    switch (platform) {
+      case "reddit":
+        return {
+          "label": "Reddit",
+          "icon": Icons.reddit,
+          "color": const Color(0xFFFF4500),
+        };
+      case "youtube":
+        return {
+          "label": "YouTube",
+          "icon": Icons.play_circle_filled,
+          "color": const Color(0xFFFF0000),
+        };
+      case "twitter":
+        return {
+          "label": "X (Twitter)",
+          "icon": Icons.alternate_email,
+          "color": const Color(0xFF000000),
+        };
+      default:
+        return {
+          "label": platform,
+          "icon": Icons.public,
+          "color": Colors.grey,
+        };
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final platforms = subscription.platforms?.split(",") ?? [];
@@ -615,15 +669,34 @@ class _SubscriptionCard extends StatelessWidget {
                   child: Wrap(
                     spacing: 6,
                     children: platforms.map((platform) {
+                      final platformInfo = _getPlatformInfo(platform);
                       return Chip(
-                        label: Text(
-                          platform.toUpperCase(),
-                          style: const TextStyle(fontSize: 11),
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              platformInfo["icon"] as IconData,
+                              size: 14,
+                              color: platformInfo["color"] as Color,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              platformInfo["label"] as String,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ],
                         ),
                         padding: EdgeInsets.zero,
                         labelPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        backgroundColor: colorScheme.primary.withOpacity(0.1),
-                        side: BorderSide.none,
+                        backgroundColor: (platformInfo["color"] as Color).withOpacity(0.1),
+                        side: BorderSide(
+                          color: (platformInfo["color"] as Color).withOpacity(0.3),
+                          width: 1,
+                        ),
                       );
                     }).toList(),
                   ),
