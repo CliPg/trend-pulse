@@ -1,11 +1,88 @@
 """
-Mermaid mind map generator for visualizing opinion clusters.
+Visualization generators for opinion clusters.
+Supports Mermaid and ECharts formats.
 """
+import json
 from typing import List, Dict
 from src.utils.logger_config import get_logger
 
 
 logger = get_logger(__name__)
+
+
+def generate_echarts_tree(
+    keyword: str,
+    clusters: List[Dict],
+    sentiment_score: float,
+    sentiment_label: str
+) -> str:
+    """
+    Generate ECharts tree data JSON for beautiful mind map visualization.
+
+    Args:
+        keyword: Main keyword/topic
+        clusters: List of opinion clusters with label, summary, mention_count
+        sentiment_score: Overall sentiment score (0-100)
+        sentiment_label: Overall sentiment label (positive/neutral/negative)
+
+    Returns:
+        JSON string for ECharts tree configuration
+    """
+    logger.info(f"Generating ECharts tree for keyword: {keyword}")
+
+    # Build tree data structure
+    children = []
+
+    # Add sentiment node
+    sentiment_color = _get_sentiment_color(sentiment_label)
+    sentiment_emoji = _get_sentiment_emoji(sentiment_label)
+    children.append({
+        "name": f"{sentiment_emoji} Sentiment",
+        "value": sentiment_score,
+        "itemStyle": {"color": sentiment_color},
+        "children": [
+            {"name": f"Score: {sentiment_score:.1f}", "value": sentiment_score},
+            {"name": sentiment_label.capitalize(), "value": 1}
+        ]
+    })
+
+    # Define colors for clusters
+    cluster_colors = ["#6366f1", "#8b5cf6", "#ec4899", "#f59e0b", "#10b981"]
+
+    # Add each opinion cluster
+    for i, cluster in enumerate(clusters[:5], 0):
+        label = cluster.get("label", f"Opinion {i+1}")
+        summary = cluster.get("summary", "")
+        mention_count = cluster.get("mention_count", 0)
+
+        # Create cluster children
+        cluster_children = [
+            {"name": f"📊 {mention_count} mentions", "value": mention_count}
+        ]
+
+        # Add summary points
+        if summary:
+            sentences = _split_into_bullets(summary, max_bullets=2)
+            for sentence in sentences:
+                cluster_children.append({
+                    "name": f"💬 {sentence}",
+                    "value": 1
+                })
+
+        children.append({
+            "name": _clean_text(label),
+            "value": mention_count,
+            "itemStyle": {"color": cluster_colors[i % len(cluster_colors)]},
+            "children": cluster_children
+        })
+
+    tree_data = {
+        "name": _clean_text(keyword),
+        "children": children
+    }
+
+    logger.info(f"Generated ECharts tree with {len(clusters)} clusters")
+    return json.dumps(tree_data, ensure_ascii=False)
 
 
 def generate_mermaid_mindmap(
@@ -16,6 +93,7 @@ def generate_mermaid_mindmap(
 ) -> str:
     """
     Generate a Mermaid mind map from opinion clusters.
+    (Legacy - kept for backward compatibility)
 
     Args:
         keyword: Main keyword/topic
@@ -26,94 +104,53 @@ def generate_mermaid_mindmap(
     Returns:
         Mermaid mind map code
     """
-    logger.info(f"Generating Mermaid mind map for keyword: {keyword}")
-
-    # Start with mindmap header
-    lines = ["mindmap", f"  root(({_sanitize_text(keyword)}))"]
-
-    # Add sentiment as first branch - use simple node format without icons
-    sentiment_emoji = _get_sentiment_emoji(sentiment_label)
-    lines.append(f"    {sentiment_emoji} Overall Sentiment")
-    lines.append(f"      Score {sentiment_score:.1f}")
-    lines.append(f"      {sentiment_label.capitalize()}")
-
-    # Add each opinion cluster as a main branch
-    for i, cluster in enumerate(clusters[:5], 1):  # Limit to top 5
-        label = cluster.get("label", f"Opinion {i}")
-        summary = cluster.get("summary", "")
-        mention_count = cluster.get("mention_count", 0)
-
-        # Sanitize and format
-        safe_label = _sanitize_text(label)
-        safe_summary = _sanitize_text(summary)
-
-        # Add cluster as main branch - use simple text nodes
-        lines.append(f"    {safe_label}")
-        lines.append(f"      {mention_count} mentions")
-
-        # Add summary as sub-points (split by sentences)
-        if safe_summary:
-            sentences = _split_into_bullets(safe_summary, max_bullets=2)
-            for sentence in sentences:
-                lines.append(f"      {sentence}")
-
-    # Close mindmap
-    mermaid_code = "\n".join(lines)
-
-    logger.info(f"Generated Mermaid mind map with {len(clusters)} clusters")
-    return mermaid_code
+    # Return ECharts JSON format instead for better visualization
+    return generate_echarts_tree(keyword, clusters, sentiment_score, sentiment_label)
 
 
-def _sanitize_text(text: str) -> str:
-    """
-    Sanitize text for Mermaid syntax.
-
-    Args:
-        text: Raw text
-
-    Returns:
-        Sanitized text safe for Mermaid
-    """
+def _clean_text(text: str) -> str:
+    """Clean text for display, preserving readability."""
     if not text:
         return ""
 
-    # Remove problematic characters
     text = text.strip()
 
-    # Replace quotes and special characters that break mermaid syntax
-    replacements = {
-        '"': "",
-        "'": "",
-        "(": "",
-        ")": "",
-        "{": "",
-        "}": "",
-        "[": "",
-        "]": "",
-        "<": "",
-        ">": "",
-        "&": "and",
-        "#": "",
-        "`": "",
-        "|": "-",
-        "\\": "",
-        "\n": " ",
-        "\r": " ",
-        "\t": " ",
-    }
-
-    for old, new in replacements.items():
-        text = text.replace(old, new)
+    # Only remove characters that would break JSON
+    text = text.replace('"', "'")
+    text = text.replace("\\", "")
+    text = text.replace("\n", " ")
+    text = text.replace("\r", " ")
+    text = text.replace("\t", " ")
 
     # Remove multiple spaces
     import re
     text = re.sub(r'\s+', ' ', text)
 
     # Limit length
-    if len(text) > 40:
-        text = text[:37] + "..."
+    if len(text) > 50:
+        text = text[:47] + "..."
 
     return text.strip()
+
+
+def _get_sentiment_color(label: str) -> str:
+    """Get color for sentiment label."""
+    mapping = {
+        "positive": "#10b981",  # Green
+        "neutral": "#f59e0b",   # Amber
+        "negative": "#ef4444",  # Red
+    }
+    return mapping.get(label.lower(), "#6366f1")
+
+
+def _get_sentiment_emoji(label: str) -> str:
+    """Get emoji for sentiment label."""
+    mapping = {
+        "positive": "😊",
+        "neutral": "😐",
+        "negative": "😟",
+    }
+    return mapping.get(label.lower(), "📊")
 
 
 def _split_into_bullets(text: str, max_bullets: int = 3) -> List[str]:
@@ -127,36 +164,11 @@ def _split_into_bullets(text: str, max_bullets: int = 3) -> List[str]:
     Returns:
         List of bullet point strings
     """
-    # Split by sentence endings
     import re
     sentences = re.split(r'[.!?]+', text)
     sentences = [s.strip() for s in sentences if s.strip()]
-
-    # Limit to max_bullets
     bullets = sentences[:max_bullets]
-
-    # Limit each bullet length
-    return [b[:40] + "..." if len(b) > 40 else b for b in bullets]
-
-
-def _get_sentiment_emoji(label: str) -> str:
-    """Get emoji for sentiment label."""
-    mapping = {
-        "positive": "😊",
-        "neutral": "😐",
-        "negative": "😟",
-    }
-    return mapping.get(label.lower(), "📊")
-
-
-def _get_sentiment_icon(label: str) -> str:
-    """Get Font Awesome icon name for sentiment."""
-    mapping = {
-        "positive": "smile",
-        "neutral": "meh",
-        "negative": "frown",
-    }
-    return mapping.get(label.lower(), "chart-line")
+    return [_clean_text(b) for b in bullets]
 
 
 def generate_mermaid_flowchart(
@@ -205,21 +217,21 @@ def generate_mermaid_flowchart(
     if positive_posts:
         lines.append("  Positive[😊 Positive]")
         for i, post in enumerate(positive_posts[:3], 1):
-            content = _sanitize_text(post.get("content", ""))[:30]
+            content = _clean_text(post.get("content", ""))[:30]
             lines.append(f"    Pos{i}[{content}]")
             lines.append(f"  Positive --> Pos{i}")
 
     if neutral_posts:
         lines.append("  Neutral[😐 Neutral]")
         for i, post in enumerate(neutral_posts[:3], 1):
-            content = _sanitize_text(post.get("content", ""))[:30]
+            content = _clean_text(post.get("content", ""))[:30]
             lines.append(f"    Neu{i}[{content}]")
             lines.append(f"  Neutral --> Neu{i}")
 
     if negative_posts:
         lines.append("  Negative[😟 Negative]")
         for i, post in enumerate(negative_posts[:3], 1):
-            content = _sanitize_text(post.get("content", ""))[:30]
+            content = _clean_text(post.get("content", ""))[:30]
             lines.append(f"    Neg{i}[{content}]")
             lines.append(f"  Negative --> Neg{i}")
 
@@ -258,7 +270,7 @@ def generate_mermaid_pie_chart(
     """
     logger.info(f"Generating Mermaid pie chart for {len(clusters)} clusters")
 
-    lines = ["pie title {} - Opinion Distribution".format(_sanitize_text(keyword))]
+    lines = ["pie title {} - Opinion Distribution".format(_clean_text(keyword))]
 
     total_mentions = sum(c.get("mention_count", 0) for c in clusters)
 
@@ -267,7 +279,7 @@ def generate_mermaid_pie_chart(
         count = cluster.get("mention_count", 0)
         percentage = (count / total_mentions * 100) if total_mentions > 0 else 0
 
-        safe_label = _sanitize_text(label)
+        safe_label = _clean_text(label)
         lines.append(f"  \"{safe_label}\" : {percentage:.1f}")
 
     mermaid_code = "\n".join(lines)

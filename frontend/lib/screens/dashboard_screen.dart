@@ -10,10 +10,9 @@ import "../services/mock_data.dart";
 import "../widgets/half_gauge.dart";
 import "../widgets/opinion_card.dart";
 import "../widgets/post_list.dart";
-import "../widgets/mermaid_viewer.dart";
 
 // Conditional import for web platform - default to stub, use web viewer only when dart:html is available
-import "../widgets/mermaid_stub.dart" if (dart.library.html) "../widgets/mermaid_web_viewer.dart";
+import "../widgets/mindmap_stub.dart" if (dart.library.html) "../widgets/mindmap_viewer.dart";
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -832,14 +831,14 @@ class _DashboardScreenState extends State<DashboardScreen>
           _buildSummaryCard(colorScheme),
           const SizedBox(height: 24),
 
-          // Mermaid Mind Map (if available)
+          // Mind Map (if available)
           if (_result?.mermaid != null && _result!.mermaid!.mindmap.isNotEmpty) ...[
-            _buildSectionHeader("Opinion Mind Map", Icons.hub),
+            _buildSectionHeader("Opinion Mind Map", Icons.hub_rounded),
             const SizedBox(height: 12),
-            _buildMermaidViewer(
-              _result!.mermaid!.mindmap,
-              _result!.keyword,
-              600,
+            MindMapViewer(
+              treeData: _result!.mermaid!.mindmap,
+              title: _result!.keyword,
+              height: 550,
             ),
             const SizedBox(height: 24),
           ],
@@ -1033,25 +1032,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
       ],
     );
-  }
-
-  Widget _buildMermaidViewer(String mermaidCode, String title, double height) {
-    // Use different viewers based on platform
-    if (kIsWeb) {
-      // For Web (Chrome), use iframe-based viewer
-      return MermaidWebViewer(
-        mermaidCode: mermaidCode,
-        title: title,
-        height: height,
-      );
-    } else {
-      // For mobile (iOS/Android), use WebView-based viewer
-      return MermaidViewer(
-        mermaidCode: mermaidCode,
-        title: title,
-        height: height,
-      );
-    }
   }
 
   Color _getSentimentColor(double score) {
