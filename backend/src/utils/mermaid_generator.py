@@ -3,11 +3,38 @@ Visualization generators for opinion clusters.
 Supports Mermaid and ECharts formats.
 """
 import json
+import os
+from datetime import datetime
 from typing import List, Dict
 from src.utils.logger_config import get_logger
 
 
 logger = get_logger(__name__)
+
+# Debug output directory
+DEBUG_OUTPUT_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'logs', 'mindmap_debug')
+
+
+def _save_debug_file(keyword: str, data: dict, suffix: str = "tree"):
+    """Save mindmap data to debug file."""
+    try:
+        os.makedirs(DEBUG_OUTPUT_DIR, exist_ok=True)
+        
+        # Create filename with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_keyword = "".join(c if c.isalnum() else "_" for c in keyword)[:30]
+        filename = f"{timestamp}_{safe_keyword}_{suffix}.json"
+        filepath = os.path.join(DEBUG_OUTPUT_DIR, filename)
+        
+        # Save with pretty formatting
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        
+        logger.info(f"Saved mindmap debug file: {filepath}")
+        return filepath
+    except Exception as e:
+        logger.warning(f"Failed to save debug file: {e}")
+        return None
 
 
 def generate_echarts_tree(
@@ -81,6 +108,18 @@ def generate_echarts_tree(
         "children": children
     }
 
+    # Save debug file
+    debug_data = {
+        "keyword": keyword,
+        "sentiment_score": sentiment_score,
+        "sentiment_label": sentiment_label,
+        "clusters_count": len(clusters),
+        "clusters_input": clusters,
+        "tree_data": tree_data,
+        "generated_at": datetime.now().isoformat()
+    }
+    _save_debug_file(keyword, debug_data, "echarts_tree")
+
     logger.info(f"Generated ECharts tree with {len(clusters)} clusters")
     return json.dumps(tree_data, ensure_ascii=False)
 
@@ -125,10 +164,6 @@ def _clean_text(text: str) -> str:
     # Remove multiple spaces
     import re
     text = re.sub(r'\s+', ' ', text)
-
-    # Limit length
-    if len(text) > 50:
-        text = text[:47] + "..."
 
     return text.strip()
 

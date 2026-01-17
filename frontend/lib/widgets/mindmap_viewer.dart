@@ -4,6 +4,7 @@ For Chrome/Desktop browsers.
 */
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 // Unique ID counter for iframes
@@ -44,7 +45,6 @@ class _MindMapViewerState extends State<MindMapViewer> {
       ..style.width = '100%'
       ..style.height = '100%'
       ..style.border = 'none'
-      ..style.pointerEvents = 'none'
       ..onLoad.listen((_) {
         if (mounted) {
           setState(() {
@@ -79,10 +79,30 @@ class _MindMapViewerState extends State<MindMapViewer> {
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #fafbfc 0%, #f0f4f8 100%);
+            position: relative;
         }
         #chart {
             width: 100%;
             height: 100%;
+            cursor: grab;
+        }
+        #chart:active {
+            cursor: grabbing;
+        }
+        .drag-hint {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            background: rgba(99, 102, 241, 0.9);
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 11px;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            pointer-events: none;
+            opacity: 0.85;
         }
         .loading {
             position: absolute;
@@ -125,6 +145,12 @@ class _MindMapViewerState extends State<MindMapViewer> {
     </div>
     <div id="chart"></div>
     <div id="error-container"></div>
+    <div class="drag-hint">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M12 12h0"/>
+        </svg>
+        拖拽查看更多
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <script>
@@ -145,14 +171,14 @@ class _MindMapViewerState extends State<MindMapViewer> {
                         backgroundColor: 'rgba(255, 255, 255, 0.98)',
                         borderColor: '#e2e8f0',
                         borderWidth: 1,
-                        borderRadius: 12,
-                        padding: [12, 16],
+                        borderRadius: 10,
+                        padding: [10, 14],
                         textStyle: {
                             color: '#334155',
-                            fontSize: 13
+                            fontSize: 12
                         },
                         formatter: function(params) {
-                            return '<strong>' + params.name + '</strong>';
+                            return '<div style="max-width:280px;word-wrap:break-word;"><strong>' + params.name + '</strong></div>';
                         }
                     },
                     series: [{
@@ -161,36 +187,35 @@ class _MindMapViewerState extends State<MindMapViewer> {
                         layout: 'orthogonal',
                         orient: 'LR',
                         symbol: 'circle',
-                        symbolSize: 12,
+                        symbolSize: 10,
                         initialTreeDepth: 3,
-                        animationDuration: 800,
+                        animationDuration: 600,
                         animationEasing: 'cubicOut',
-                        roam: false,
+                        roam: 'move',
+                        zoom: 1.0,
                         top: '5%',
                         bottom: '5%',
-                        left: '12%',
-                        right: '25%',
+                        left: '8%',
+                        right: '15%',
+                        nodeGap: 18,
+                        layerPadding: 80,
                         label: {
                             show: true,
                             position: 'right',
                             verticalAlign: 'middle',
-                            distance: 10,
-                            fontSize: 13,
+                            distance: 8,
+                            fontSize: 12,
                             fontWeight: 500,
                             color: '#334155',
                             formatter: function(params) {
-                                const name = params.name || '';
-                                if (name.length > 30) {
-                                    return name.substring(0, 27) + '...';
-                                }
-                                return name;
+                                return params.name || '';
                             }
                         },
                         leaves: {
                             label: {
                                 position: 'right',
                                 verticalAlign: 'middle',
-                                fontSize: 12,
+                                fontSize: 11,
                                 fontWeight: 400,
                                 color: '#64748b'
                             }
@@ -200,28 +225,28 @@ class _MindMapViewerState extends State<MindMapViewer> {
                             color: '#6366f1',
                             borderColor: '#4f46e5',
                             borderWidth: 2,
-                            shadowColor: 'rgba(99, 102, 241, 0.25)',
-                            shadowBlur: 8
+                            shadowColor: 'rgba(99, 102, 241, 0.2)',
+                            shadowBlur: 6
                         },
                         lineStyle: {
                             color: '#c7d2fe',
-                            width: 2,
-                            curveness: 0.5
+                            width: 1.5,
+                            curveness: 0.3
                         },
                         emphasis: {
                             focus: 'descendant',
                             itemStyle: {
                                 color: '#4f46e5',
                                 borderColor: '#3730a3',
-                                shadowBlur: 15,
-                                shadowColor: 'rgba(99, 102, 241, 0.4)'
+                                shadowBlur: 10,
+                                shadowColor: 'rgba(99, 102, 241, 0.35)'
                             },
                             lineStyle: {
-                                width: 3,
-                                color: '#6366f1'
+                                width: 2,
+                                color: '#818cf8'
                             },
                             label: {
-                                fontSize: 14,
+                                fontSize: 13,
                                 fontWeight: 600
                             }
                         }
@@ -348,7 +373,14 @@ class _MindMapViewerState extends State<MindMapViewer> {
                 ),
                 const SizedBox(width: 12),
                 _buildActionButton(
+                  icon: Icons.open_in_full_rounded,
+                  tooltip: '全屏查看',
+                  onTap: () => _showFullScreenDialog(context),
+                ),
+                const SizedBox(width: 8),
+                _buildActionButton(
                   icon: Icons.refresh_rounded,
+                  tooltip: '刷新',
                   onTap: () {
                     setState(() {
                       _isLoading = true;
@@ -360,13 +392,13 @@ class _MindMapViewerState extends State<MindMapViewer> {
             ),
           ),
 
-          // Chart content
+          // Chart content with interaction hint - 使用透明覆盖层拦截滚动
           ClipRRect(
             borderRadius: const BorderRadius.only(
               bottomLeft: Radius.circular(24),
               bottomRight: Radius.circular(24),
             ),
-            child: SizedBox(
+            child: _ScrollBlocker(
               height: widget.height,
               child: Stack(
                 children: [
@@ -403,6 +435,7 @@ class _MindMapViewerState extends State<MindMapViewer> {
                         ),
                       ),
                     ),
+
                 ],
               ),
             ),
@@ -411,30 +444,101 @@ class _MindMapViewerState extends State<MindMapViewer> {
       ),
     );
   }
+  
+  void _showFullScreenDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.95,
+          height: MediaQuery.of(context).size.height * 0.9,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Column(
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF6366f1), Color(0xFF8b5cf6)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.hub_rounded, color: Colors.white, size: 24),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '${widget.title} - Mind Map',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded, color: Colors.white),
+                    ),
+                  ],
+                ),
+              ),
+              // Full screen chart
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(24),
+                  ),
+                  child: _FullScreenMindMap(treeData: widget.treeData),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildActionButton({
     required IconData icon,
+    required String tooltip,
     required VoidCallback onTap,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.25),
-              width: 1,
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.25),
+                width: 1,
+              ),
             ),
-          ),
-          child: Icon(
-            icon,
-            color: Colors.white,
-            size: 20,
+            child: Icon(
+              icon,
+              color: Colors.white,
+              size: 20,
+            ),
           ),
         ),
       ),
@@ -445,5 +549,167 @@ class _MindMapViewerState extends State<MindMapViewer> {
   void dispose() {
     _iframeElement.remove();
     super.dispose();
+  }
+}
+
+// Full screen mind map widget for dialog
+class _FullScreenMindMap extends StatefulWidget {
+  final String treeData;
+  
+  const _FullScreenMindMap({required this.treeData});
+  
+  @override
+  State<_FullScreenMindMap> createState() => _FullScreenMindMapState();
+}
+
+class _FullScreenMindMapState extends State<_FullScreenMindMap> {
+  late html.IFrameElement _iframeElement;
+  late String _viewType;
+  bool _isRegistered = false;
+  
+  @override
+  void initState() {
+    super.initState();
+    _viewType = 'echarts-fullscreen-${_echartsIdCounter++}';
+    _initializeIframe();
+  }
+  
+  void _initializeIframe() {
+    _iframeElement = html.IFrameElement()
+      ..srcdoc = _generateHtml()
+      ..style.width = '100%'
+      ..style.height = '100%'
+      ..style.border = 'none';
+  }
+  
+  String _generateHtml() {
+    return '''
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; overflow: hidden; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #fafbfc 0%, #f0f4f8 100%);
+        }
+        #chart { width: 100%; height: 100%; cursor: grab; }
+        #chart:active { cursor: grabbing; }
+        .hint {
+            position: absolute;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(99, 102, 241, 0.9);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div id="chart"></div>
+    <div class="hint">🖱️ 拖拽移动 · 滚轮缩放</div>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script>
+        const treeData = ${widget.treeData};
+        const chart = echarts.init(document.getElementById('chart'));
+        chart.setOption({
+            backgroundColor: 'transparent',
+            tooltip: {
+                trigger: 'item',
+                backgroundColor: 'rgba(255,255,255,0.98)',
+                borderColor: '#e2e8f0',
+                borderRadius: 10,
+                padding: [10, 14],
+                textStyle: { color: '#334155', fontSize: 13 },
+                formatter: p => '<div style="max-width:350px;word-wrap:break-word;"><strong>' + p.name + '</strong></div>'
+            },
+            series: [{
+                type: 'tree',
+                data: [treeData],
+                layout: 'orthogonal',
+                orient: 'LR',
+                symbol: 'circle',
+                symbolSize: 12,
+                initialTreeDepth: 4,
+                roam: 'move',
+                zoom: 1.0,
+                top: '5%',
+                bottom: '5%',
+                left: '8%',
+                right: '15%',
+                nodeGap: 20,
+                layerPadding: 100,
+                label: {
+                    show: true,
+                    position: 'right',
+                    distance: 10,
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: '#334155'
+                },
+                leaves: {
+                    label: { fontSize: 12, color: '#64748b' }
+                },
+                itemStyle: {
+                    color: '#6366f1',
+                    borderColor: '#4f46e5',
+                    borderWidth: 2
+                },
+                lineStyle: {
+                    color: '#c7d2fe',
+                    width: 1.5,
+                    curveness: 0.3
+                },
+                emphasis: {
+                    focus: 'descendant',
+                    itemStyle: { color: '#4f46e5' },
+                    label: { fontSize: 14, fontWeight: 600 }
+                }
+            }]
+        });
+        window.addEventListener('resize', () => chart.resize());
+    </script>
+</body>
+</html>
+''';
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    if (!_isRegistered) {
+      _isRegistered = true;
+      ui_web.platformViewRegistry.registerViewFactory(
+        _viewType,
+        (int viewId) => _iframeElement,
+      );
+    }
+    return HtmlElementView(viewType: _viewType);
+  }
+  
+  @override
+  void dispose() {
+    _iframeElement.remove();
+    super.dispose();
+  }
+}
+
+/// 简单包装器，不阻止页面滚动
+class _ScrollBlocker extends StatelessWidget {
+  final Widget child;
+  final double height;
+
+  const _ScrollBlocker({required this.child, required this.height});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: height,
+      child: child,
+    );
   }
 }
