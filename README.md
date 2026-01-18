@@ -19,6 +19,10 @@
 
 TrendPulse 舆情脉冲是一款全栈社交媒体情感分析应用，能够从 Reddit、YouTube 和 X/Twitter 等平台自动采集数据，并通过 AI 技术进行情感分析、观点聚类和摘要生成，最终在 Flutter 仪表盘中可视化展示分析结果。
 
+<p align="center">
+  <img src="./docs/imgs/demo.png" width="400">
+</p>
+
 ### ✨ 核心功能
 
 - **🌍 多平台数据采集**
