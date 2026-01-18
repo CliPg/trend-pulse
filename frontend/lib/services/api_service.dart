@@ -3,7 +3,47 @@ API service for communicating with TrendPulse backend.
 Handles HTTP requests and response parsing.
 */
 import "dart:convert";
+import "dart:async";
 import "package:http/http.dart" as http;
+
+/// Progress event from the analysis stream
+class AnalysisProgressEvent {
+  final String stage;
+  final String message;
+  final Map<String, dynamic> data;
+  final String? timestamp;
+
+  AnalysisProgressEvent({
+    required this.stage,
+    required this.message,
+    required this.data,
+    this.timestamp,
+  });
+
+  factory AnalysisProgressEvent.fromJson(Map<String, dynamic> json) {
+    return AnalysisProgressEvent(
+      stage: json["stage"] ?? "",
+      message: json["message"] ?? "",
+      data: json["data"] ?? {},
+      timestamp: json["timestamp"],
+    );
+  }
+
+  /// Get platform icon name based on data
+  String? get platform => data["platform"];
+
+  /// Get collected count if available
+  int? get count => data["count"];
+
+  /// Check if this is a result event
+  bool get isResult => stage == "result";
+
+  /// Check if this is an error event
+  bool get isError => stage == "error";
+
+  /// Check if this is the completion event
+  bool get isComplete => stage == "complete";
+}
 
 class AnalysisResult {
   final String keyword;
@@ -213,6 +253,70 @@ class Alert {
 
 class ApiService {
   static const String baseUrl = "http://localhost:8000";
+
+  /// Analyze keyword with streaming progress updates (SSE)
+  /// Returns a stream of progress events, with the final event containing the result
+  Stream<AnalysisProgressEvent> analyzeKeywordWithProgress({
+    required String keyword,
+    String language = "en",
+    List<String>? platforms,
+    int limitPerPlatform = 50,
+  }) async* {
+    final client = http.Client();
+
+    try {
+      final request = http.Request(
+        "POST",
+        Uri.parse("$baseUrl/analyze/stream"),
+      );
+      request.headers["Content-Type"] = "application/json";
+      request.headers["Accept"] = "text/event-stream";
+      request.body = jsonEncode({
+        "keyword": keyword,
+        "language": language,
+        "platforms": platforms,
+        "limit_per_platform": limitPerPlatform,
+      });
+
+      final response = await client.send(request);
+
+      if (response.statusCode != 200) {
+        final body = await response.stream.bytesToString();
+        throw Exception("Failed to start analysis: $body");
+      }
+
+      // Parse SSE stream
+      String buffer = "";
+      await for (final chunk in response.stream.transform(utf8.decoder)) {
+        buffer += chunk;
+
+        // Process complete SSE messages
+        while (buffer.contains("\n\n")) {
+          final messageEnd = buffer.indexOf("\n\n");
+          final message = buffer.substring(0, messageEnd);
+          buffer = buffer.substring(messageEnd + 2);
+
+          // Skip heartbeat comments
+          if (message.startsWith(":")) continue;
+
+          // Parse data lines
+          for (final line in message.split("\n")) {
+            if (line.startsWith("data: ")) {
+              final jsonStr = line.substring(6);
+              try {
+                final json = jsonDecode(jsonStr);
+                yield AnalysisProgressEvent.fromJson(json);
+              } catch (e) {
+                // Skip malformed JSON
+              }
+            }
+          }
+        }
+      }
+    } finally {
+      client.close();
+    }
+  }
 
   Future<AnalysisResult> analyzeKeyword({
     required String keyword,

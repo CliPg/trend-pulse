@@ -39,6 +39,11 @@ class _DashboardScreenState extends State<DashboardScreen>
   String _selectedLanguage = "en";
   final TextEditingController _limitController = TextEditingController(text: "50");
 
+  // Progress tracking for streaming analysis
+  final List<AnalysisProgressEvent> _progressLogs = [];
+  String _currentStage = "";
+  Map<String, int> _collectedCounts = {};  // Platform -> count
+
   @override
   void initState() {
     super.initState();
@@ -94,21 +99,70 @@ class _DashboardScreenState extends State<DashboardScreen>
       _isLoading = true;
       _result = null;
       _errorMessage = null;
+      _progressLogs.clear();
+      _currentStage = "";
+      _collectedCounts.clear();
     });
 
     try {
-      final result = await ApiService().analyzeKeyword(
+      // Use streaming API for real-time progress updates
+      await for (final event in ApiService().analyzeKeywordWithProgress(
         keyword: _keywordController.text,
         language: _selectedLanguage,
         platforms: _selectedPlatforms.toList(),
         limitPerPlatform: limit,
-      );
+      )) {
+        if (!mounted) return;
 
-      setState(() {
-        _result = result;
-        _isLoading = false;
-      });
+        setState(() {
+          _progressLogs.add(event);
+          _currentStage = event.stage;
+
+          // Track collected counts per platform
+          if (event.stage == "collecting" && event.platform != null && event.count != null) {
+            _collectedCounts[event.platform!] = event.count!;
+          }
+        });
+
+        // Handle result event
+        if (event.isResult && event.data.isNotEmpty) {
+          setState(() {
+            _result = AnalysisResult.fromJson(event.data);
+            _isLoading = false;
+          });
+          return;
+        }
+
+        // Handle error event
+        if (event.isError) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = event.message;
+          });
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text("Error: ${event.message}"),
+                backgroundColor: Colors.red.shade400,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            );
+          }
+          return;
+        }
+      }
+
+      // If we get here without a result, something went wrong
+      if (_result == null && mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = "Analysis completed without result";
+        });
+      }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
         _errorMessage = e.toString();
@@ -729,7 +783,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Widget _buildLoadingIndicator() {
     return Container(
-      padding: const EdgeInsets.all(40),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -742,23 +796,279 @@ class _DashboardScreenState extends State<DashboardScreen>
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const CircularProgressIndicator(),
+          // Header with spinner and current stage
+          Row(
+            children: [
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 3),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _getStageTitle(_currentStage),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _getStageSubtitle(_currentStage),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[500],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
           const SizedBox(height: 20),
-          Text(
-            "Analyzing social media...",
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey[700],
+
+          // Progress stages indicator
+          _buildProgressStages(),
+
+          const SizedBox(height: 20),
+
+          // Platform collection stats
+          if (_collectedCounts.isNotEmpty) ...[
+            _buildCollectionStats(),
+            const SizedBox(height: 16),
+          ],
+
+          // Log messages
+          Container(
+            height: 180,
+            decoration: BoxDecoration(
+              color: Colors.grey[50],
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[200]!),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: ListView.builder(
+                padding: const EdgeInsets.all(12),
+                itemCount: _progressLogs.length,
+                itemBuilder: (context, index) {
+                  final log = _progressLogs[index];
+                  return _buildLogEntry(log);
+                },
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            "This may take 30-60 seconds",
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[500],
+        ],
+      ),
+    );
+  }
+
+  String _getStageTitle(String stage) {
+    switch (stage) {
+      case "init":
+        return "Initializing...";
+      case "database":
+        return "Preparing Database";
+      case "collecting":
+        return "Collecting Data";
+      case "analyzing":
+        return "AI Analysis";
+      case "visualizing":
+        return "Creating Visualizations";
+      case "complete":
+        return "Complete!";
+      case "error":
+        return "Error Occurred";
+      default:
+        return "Processing...";
+    }
+  }
+
+  String _getStageSubtitle(String stage) {
+    switch (stage) {
+      case "init":
+        return "Setting up analysis pipeline";
+      case "database":
+        return "Connecting to database";
+      case "collecting":
+        return "Gathering posts from social platforms";
+      case "analyzing":
+        return "Running sentiment analysis";
+      case "visualizing":
+        return "Generating charts and insights";
+      case "complete":
+        return "Analysis finished successfully";
+      case "error":
+        return "Something went wrong";
+      default:
+        return "Please wait...";
+    }
+  }
+
+  Widget _buildProgressStages() {
+    final stages = ["init", "collecting", "analyzing", "visualizing", "complete"];
+    final currentIndex = stages.indexOf(_currentStage);
+
+    return Row(
+      children: stages.asMap().entries.map((entry) {
+        final index = entry.key;
+        final stage = entry.value;
+        final isCompleted = currentIndex > index;
+        final isCurrent = currentIndex == index;
+        final isLast = index == stages.length - 1;
+
+        return Expanded(
+          child: Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isCompleted
+                      ? Colors.green
+                      : isCurrent
+                          ? Theme.of(context).colorScheme.primary
+                          : Colors.grey[300],
+                ),
+                child: Center(
+                  child: isCompleted
+                      ? const Icon(Icons.check, color: Colors.white, size: 16)
+                      : isCurrent
+                          ? const SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              "${index + 1}",
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                ),
+              ),
+              if (!isLast)
+                Expanded(
+                  child: Container(
+                    height: 3,
+                    color: isCompleted ? Colors.green : Colors.grey[300],
+                  ),
+                ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildCollectionStats() {
+    final platformIcons = {
+      "reddit": Icons.reddit,
+      "youtube": Icons.play_circle_fill,
+      "twitter": Icons.alternate_email,
+    };
+    final platformColors = {
+      "reddit": Colors.deepOrange,
+      "youtube": Colors.red,
+      "twitter": Colors.blue,
+    };
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: _collectedCounts.entries.map((entry) {
+        final platform = entry.key;
+        final count = entry.value;
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: (platformColors[platform] ?? Colors.grey).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                platformIcons[platform] ?? Icons.public,
+                color: platformColors[platform] ?? Colors.grey,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                "$count",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: platformColors[platform] ?? Colors.grey,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                "posts",
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildLogEntry(AnalysisProgressEvent log) {
+    final stageIcons = {
+      "init": Icons.play_arrow,
+      "database": Icons.storage,
+      "collecting": Icons.download,
+      "analyzing": Icons.psychology,
+      "visualizing": Icons.bar_chart,
+      "complete": Icons.check_circle,
+      "error": Icons.error,
+    };
+    final stageColors = {
+      "init": Colors.blue,
+      "database": Colors.purple,
+      "collecting": Colors.orange,
+      "analyzing": Colors.teal,
+      "visualizing": Colors.indigo,
+      "complete": Colors.green,
+      "error": Colors.red,
+    };
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            stageIcons[log.stage] ?? Icons.info_outline,
+            size: 16,
+            color: stageColors[log.stage] ?? Colors.grey,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              log.message,
+              style: TextStyle(
+                fontSize: 13,
+                color: log.stage == "error" ? Colors.red : Colors.grey[700],
+                fontWeight: log.stage == "complete" ? FontWeight.bold : FontWeight.normal,
+              ),
             ),
           ),
         ],
@@ -1110,9 +1420,9 @@ class _DashboardScreenState extends State<DashboardScreen>
     // Calculate heat score based on posts and engagement
     int totalEngagement = 0;
     for (var post in _result!.posts) {
-      totalEngagement += (post.upvotes ?? 0) + (post.likes ?? 0);
+      totalEngagement = totalEngagement + (post.upvotes ?? 0) + (post.likes ?? 0);
     }
     // Heat score = posts count + average engagement
-    return _result!.postsCount + (totalEngagement / _result!.postsCount).round();
+    return _result!.postsCount + (totalEngagement ~/ _result!.postsCount);
   }
 }

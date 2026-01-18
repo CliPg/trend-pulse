@@ -2,11 +2,14 @@
 FastAPI application for TrendPulse.
 Provides REST API endpoints for the Flutter frontend.
 """
+import json
+import asyncio
 from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, AsyncGenerator
 
 from src.database.operations import DatabaseManager
 from src.database.models import Subscription, Alert
@@ -139,6 +142,113 @@ async def root():
 async def health():
     """Health check endpoint."""
     return {"status": "ok"}
+
+
+@app.post("/analyze/stream")
+async def analyze_keyword_stream(request: AnalysisRequest):
+    """
+    Analyze sentiment for a keyword with streaming progress updates (SSE).
+
+    This endpoint uses Server-Sent Events (SSE) to stream progress updates
+    in real-time while the analysis is running.
+
+    Progress events include:
+    - init: Analysis started
+    - collecting: Data collection from platforms
+    - database: Database operations
+    - analyzing: AI analysis in progress
+    - visualizing: Generating charts
+    - complete: Analysis finished
+    - error: Error occurred
+    - result: Final result data
+    """
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        """Generate SSE events for analysis progress."""
+        progress_queue: asyncio.Queue = asyncio.Queue()
+        final_result = None
+        error_occurred = None
+
+        def progress_callback(stage: str, message: str, data: Optional[dict] = None):
+            """Callback to receive progress updates from orchestrator."""
+            event_data = {
+                "stage": stage,
+                "message": message,
+                "data": data or {},
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            try:
+                progress_queue.put_nowait(event_data)
+            except asyncio.QueueFull:
+                pass  # Skip if queue is full
+
+        async def run_analysis():
+            """Run the analysis in background."""
+            nonlocal final_result, error_occurred
+            try:
+                result = await orchestrator.analyze_keyword(
+                    keyword=request.keyword,
+                    language=request.language,
+                    platforms=request.platforms,
+                    limit_per_platform=request.limit_per_platform,
+                    progress_callback=progress_callback,
+                )
+                final_result = result
+            except Exception as e:
+                error_occurred = str(e)
+                progress_callback("error", f"Analysis failed: {str(e)}", {"error": str(e)})
+
+        # Start analysis task
+        analysis_task = asyncio.create_task(run_analysis())
+
+        try:
+            # Stream progress events
+            while not analysis_task.done():
+                try:
+                    # Wait for progress update with timeout
+                    event_data = await asyncio.wait_for(
+                        progress_queue.get(),
+                        timeout=0.5
+                    )
+                    yield f"data: {json.dumps(event_data)}\n\n"
+                except asyncio.TimeoutError:
+                    # Send heartbeat to keep connection alive
+                    yield f": heartbeat\n\n"
+                    continue
+
+            # Drain any remaining events from queue
+            while not progress_queue.empty():
+                try:
+                    event_data = progress_queue.get_nowait()
+                    yield f"data: {json.dumps(event_data)}\n\n"
+                except asyncio.QueueEmpty:
+                    break
+
+            # Wait for task to complete and get any exception
+            await analysis_task
+
+            # Send final result or error
+            if error_occurred:
+                yield f"data: {json.dumps({'stage': 'error', 'message': error_occurred, 'data': {}})}\n\n"
+            elif final_result:
+                # Send result in a separate event
+                yield f"data: {json.dumps({'stage': 'result', 'message': 'Analysis complete', 'data': final_result})}\n\n"
+
+        except asyncio.CancelledError:
+            analysis_task.cancel()
+            raise
+
+    logger.info(f"Starting streaming analysis for keyword: '{request.keyword}'")
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        }
+    )
 
 
 @app.post("/analyze", response_model=AnalysisResponse)

@@ -2,8 +2,9 @@
 Main orchestrator for TrendPulse.
 Coordinates data collection, AI analysis, and database operations.
 """
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Callable, Any
 from datetime import datetime
+import asyncio
 
 from src.collectors.reddit import RedditCollector
 from src.collectors.youtube import YouTubeCollector
@@ -17,6 +18,10 @@ from src.utils.mermaid_generator import (
     generate_mermaid_pie_chart,
     generate_mermaid_flowchart
 )
+
+
+# Progress callback type for streaming updates
+ProgressCallback = Callable[[str, str, Optional[Dict[str, Any]]], None]
 
 
 class TrendPulseOrchestrator:
@@ -56,6 +61,7 @@ class TrendPulseOrchestrator:
         language: str = "en",
         platforms: Optional[List[str]] = None,
         limit_per_platform: int = 20,  # Reduced from 50 to 20 for testing
+        progress_callback: Optional[ProgressCallback] = None,
     ) -> Dict:
         """
         Complete analysis pipeline for a keyword.
@@ -65,20 +71,39 @@ class TrendPulseOrchestrator:
             language: Language code (en, zh)
             platforms: List of platforms (default: all available)
             limit_per_platform: Max posts per platform
+            progress_callback: Optional callback for progress updates
+                               Signature: (stage: str, message: str, data: Optional[Dict]) -> None
 
         Returns:
             Dict with analysis results and metadata
         """
+        # Helper function for progress updates
+        async def report_progress(stage: str, message: str, data: Optional[Dict] = None):
+            self.logger.info(f"[{stage}] {message}")
+            if progress_callback:
+                try:
+                    progress_callback(stage, message, data)
+                    await asyncio.sleep(0)  # Yield control to allow SSE to flush
+                except Exception as e:
+                    self.logger.warning(f"Progress callback error: {e}")
+
         # Default to all platforms if none specified
         if platforms is None:
             platforms = ["reddit", "youtube", "twitter"]
 
-        self.logger.info(f"Starting analysis for keyword: '{keyword}'")
+        await report_progress("init", f"Starting analysis for keyword: '{keyword}'", {
+            "keyword": keyword,
+            "platforms": platforms,
+            "language": language,
+            "limit": limit_per_platform
+        })
+
         self.logger.info(f"Platforms: {', '.join(platforms)}")
         self.logger.info(f"Language: {language}")
         self.logger.info(f"Limit: {limit_per_platform} per platform")
 
         # Create or get keyword entry
+        await report_progress("database", "Preparing database...")
         db_keyword = await self.db.get_or_create_keyword(keyword, language)
 
         # Collect data from all platforms
@@ -86,42 +111,55 @@ class TrendPulseOrchestrator:
 
         # Reddit
         if "reddit" in platforms:
-            self.logger.info("Collecting from Reddit...")
+            await report_progress("collecting", "Collecting data from Reddit...", {"platform": "reddit"})
             try:
                 reddit_posts = await self.reddit_collector.search(
                     keyword, language, limit_per_platform
                 )
                 all_posts.extend(reddit_posts)
-                self.logger.info(f"Collected {len(reddit_posts)} posts from Reddit")
+                await report_progress("collecting", f"Collected {len(reddit_posts)} posts from Reddit", {
+                    "platform": "reddit",
+                    "count": len(reddit_posts)
+                })
             except Exception as e:
                 self.logger.error(f"Reddit collection failed: {e}")
+                await report_progress("error", f"Reddit collection failed: {str(e)[:100]}", {"platform": "reddit"})
 
         # YouTube
         if "youtube" in platforms:
-            self.logger.info("Collecting from YouTube...")
+            await report_progress("collecting", "Collecting data from YouTube...", {"platform": "youtube"})
             try:
                 youtube_posts = await self.youtube_collector.search(
                     keyword, language, limit_per_platform
                 )
                 all_posts.extend(youtube_posts)
-                self.logger.info(f"Collected {len(youtube_posts)} posts from YouTube")
+                await report_progress("collecting", f"Collected {len(youtube_posts)} comments from YouTube", {
+                    "platform": "youtube",
+                    "count": len(youtube_posts)
+                })
             except Exception as e:
                 self.logger.error(f"YouTube collection failed: {e}")
+                await report_progress("error", f"YouTube collection failed: {str(e)[:100]}", {"platform": "youtube"})
 
         # Twitter (optional)
         if "twitter" in platforms:
-            self.logger.info("Collecting from Twitter...")
+            await report_progress("collecting", "Collecting data from Twitter/X...", {"platform": "twitter"})
             try:
                 twitter_posts = await self.twitter_collector.search(
                     keyword, language, limit_per_platform
                 )
                 all_posts.extend(twitter_posts)
-                self.logger.info(f"Collected {len(twitter_posts)} posts from Twitter")
+                await report_progress("collecting", f"Collected {len(twitter_posts)} tweets from Twitter/X", {
+                    "platform": "twitter",
+                    "count": len(twitter_posts)
+                })
             except Exception as e:
                 self.logger.error(f"Twitter collection failed: {e}")
+                await report_progress("error", f"Twitter collection failed: {str(e)[:100]}", {"platform": "twitter"})
 
         if not all_posts:
             self.logger.error("No posts collected from any platform")
+            await report_progress("error", "No posts collected from any platform", {"total": 0})
             return {
                 "keyword": keyword,
                 "status": "failed",
@@ -129,10 +167,10 @@ class TrendPulseOrchestrator:
                 "posts_count": 0,
             }
 
-        self.logger.info(f"Total posts collected: {len(all_posts)}")
+        await report_progress("collecting", f"Total posts collected: {len(all_posts)}", {"total": len(all_posts)})
 
         # Save posts to database
-        self.logger.info("Saving to database...")
+        await report_progress("database", "Saving posts to database...")
         posts_data = [
             {
                 "platform": post.platform,
@@ -149,18 +187,22 @@ class TrendPulseOrchestrator:
         ]
 
         saved_posts = await self.db.save_posts(posts_data, db_keyword.id)
-        self.logger.info(f"Saved {len(saved_posts)} posts to database")
+        await report_progress("database", f"Saved {len(saved_posts)} posts to database", {"saved": len(saved_posts)})
 
         # Run AI analysis
-        self.logger.info("Running AI analysis...")
+        await report_progress("analyzing", "Running AI sentiment analysis...", {"total_posts": len(saved_posts)})
         posts_for_analysis = [
             {"content": post.content, "author": post.author} for post in saved_posts
         ]
 
         analysis_results = await self.pipeline.analyze_posts(posts_for_analysis)
+        await report_progress("analyzing", "AI analysis complete, processing results...", {
+            "sentiment": analysis_results.get("overall_sentiment"),
+            "clusters": len(analysis_results.get("clusters", []))
+        })
 
         # Update sentiment scores in database
-        self.logger.info("Saving analysis results...")
+        await report_progress("database", "Saving analysis results to database...")
         for post, sentiment_result in zip(saved_posts, analysis_results["sentiment_results"]):
             await self.db.update_sentiment(
                 post.id,
@@ -187,7 +229,7 @@ class TrendPulseOrchestrator:
             analysis_results["summary"],
         )
 
-        self.logger.info("Analysis complete!")
+        await report_progress("visualizing", "Generating visualizations...")
 
         # Generate Mermaid visualizations
         sentiment_label = self._get_sentiment_label(analysis_results["overall_sentiment"])
@@ -221,6 +263,12 @@ class TrendPulseOrchestrator:
             posts=posts_data,
             top_n=10
         )
+
+        await report_progress("complete", "Analysis complete!", {
+            "posts_count": len(saved_posts),
+            "sentiment": analysis_results["overall_sentiment"],
+            "sentiment_label": sentiment_label
+        })
 
         return {
             "keyword": keyword,
